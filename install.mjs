@@ -552,9 +552,15 @@ async function download(url, { allowLocal = false, limit = 128 * 1024 * 1024 } =
   const parsed = new URL(url);
   if (allowLocal && parsed.protocol === "file:") {
     const file = fileURLToPath(parsed);
-    if ((await stat(file)).size > limit)
+    const info = await stat(file);
+    if (!info.isFile())
+      throw new Error("DOWNLOAD_FILE_NOT_REGULAR");
+    if (info.size > limit)
       throw new Error("DOWNLOAD_TOO_LARGE");
-    return readFile2(file);
+    const bytes = await readFile2(file);
+    if (bytes.length > limit)
+      throw new Error("DOWNLOAD_TOO_LARGE");
+    return bytes;
   }
   if (parsed.protocol !== "https:" || parsed.username || parsed.password)
     throw new Error("DOWNLOAD_URL_INVALID");
@@ -620,6 +626,57 @@ function inspectArchive(bytes, artifact, manifest) {
   if (!definition || metadata.platform !== definition.platform || metadata.arch !== definition.arch)
     throw new Error("PACKAGE_PLATFORM_MISMATCH");
   return files;
+}
+async function candidateFromArchive(file, { platform = process.platform, arch = process.arch } = {}) {
+  const target = `bun-${platform === "win32" ? "windows" : platform}-${arch}`;
+  if (!Object.hasOwn(TARGETS, target))
+    throw new Error("PLATFORM_NOT_SUPPORTED");
+  const url = pathToFileURL(path2.resolve(file)).href;
+  const bytes = await download(url, { allowLocal: true });
+  let size = 0;
+  let found = false;
+  const entries = unzipSync(bytes, { filter(info) {
+    size += info.originalSize;
+    if (size > 128 * 1024 * 1024)
+      throw new Error("ARCHIVE_TOO_LARGE");
+    if (info.name !== "ds160-autofill/release.json")
+      return false;
+    if (found)
+      throw new Error("ARCHIVE_FILE_NOT_ALLOWED");
+    found = true;
+    if (info.originalSize > 1024 * 1024)
+      throw new Error("ARCHIVE_TOO_LARGE");
+    return true;
+  } });
+  const metadataBytes = entries["ds160-autofill/release.json"];
+  if (!metadataBytes)
+    throw new Error("CANDIDATE_METADATA_MISSING");
+  if (metadataBytes.length > 1024 * 1024)
+    throw new Error("ARCHIVE_TOO_LARGE");
+  let metadata;
+  try {
+    metadata = JSON.parse(Buffer.from(metadataBytes).toString("utf8"));
+  } catch {
+    throw new Error("CANDIDATE_METADATA_INVALID");
+  }
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
+    throw new Error("CANDIDATE_METADATA_INVALID");
+  if (metadata.platform !== TARGETS[target].platform || metadata.arch !== TARGETS[target].arch)
+    throw new Error("PACKAGE_PLATFORM_MISMATCH");
+  const manifest = Object.fromEntries(Object.keys(CONTRACT).map((key) => [key, metadata[key]]));
+  manifest.version = metadata.version;
+  manifest.channel = "candidate";
+  manifest.artifacts = { [target]: {
+    filename: `ds160-autofill-${metadata.version}-${target}.zip`,
+    executable: metadata.executable,
+    build_id: metadata.build_id,
+    sha256: sha256(bytes),
+    size: bytes.length,
+    url
+  } };
+  assertManifest(manifest, { allowLocal: true });
+  inspectArchive(bytes, manifest.artifacts[target], manifest);
+  return { manifest, bytes };
 }
 async function listFiles(directory) {
   const files = [];
@@ -856,6 +913,7 @@ async function main(argv = process.argv.slice(2)) {
     workspace: { type: "string" },
     version: { type: "string" },
     "manifest-file": { type: "string" },
+    "candidate-archive": { type: "string" },
     "skip-dependencies": { type: "boolean" },
     "allow-downgrade": { type: "boolean" },
     check: { type: "boolean" },
@@ -870,13 +928,17 @@ async function main(argv = process.argv.slice(2)) {
       seen.add(token.name);
     }
   if (values.help) {
-    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> [--driver-dir <dir>] [--workspace <dir>] [--version <version>] [--check | --rollback]
---manifest-file is for explicitly supplied private candidates. --skip-dependencies requires a working existing driver.`);
+    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> [--driver-dir <dir>] [--workspace <dir>] [--version <version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback]
+--candidate-archive installs an explicitly trusted local candidate, not a stable release. --skip-dependencies requires a working existing driver.`);
     return;
+  }
+  for (const key of ["version", "manifest-file", "candidate-archive"]) {
+    if (seen.has(key) && !values[key])
+      throw new Error(`INVALID_ARGUMENT: empty --${key}`);
   }
   if (!values.dest || !path2.isAbsolute(values.dest))
     throw new Error("DESTINATION_REQUIRED: provide the absolute target Agent Skill directory.");
-  if (values.rollback && (values.check || values.version || values["manifest-file"]))
+  if (values.rollback && (values.check || values.version || values["manifest-file"] || values["candidate-archive"]))
     throw new Error("INVALID_ARGUMENT: incompatible rollback options");
   if (values.rollback) {
     console.log(JSON.stringify(await rollback(values.dest)));
@@ -884,20 +946,23 @@ async function main(argv = process.argv.slice(2)) {
   }
   if (values.version && !validVersion(values.version))
     throw new Error("VERSION_INVALID");
-  if (values.version && values["manifest-file"])
-    throw new Error("INVALID_ARGUMENT: version and manifest-file");
-  const manifest = values["manifest-file"] ? JSON.parse(await download(pathToFileURL(path2.resolve(values["manifest-file"])).href, { allowLocal: true, limit: 1024 * 1024 })) : JSON.parse(await download(values.version ? `https://github.com/${DOWNLOAD_REPOSITORY}/releases/download/v${values.version}/manifest.json` : STABLE_URL, { limit: 1024 * 1024 }));
-  assertManifest(manifest, { allowLocal: Boolean(values["manifest-file"]), requireStable: !values["manifest-file"] });
+  if ([values.version, values["manifest-file"], values["candidate-archive"]].filter(Boolean).length > 1)
+    throw new Error("INVALID_ARGUMENT: choose one of version, manifest-file or candidate-archive");
+  const candidate = values["candidate-archive"] ? await candidateFromArchive(values["candidate-archive"]) : null;
+  const allowLocal = Boolean(values["manifest-file"] || candidate);
+  const manifest = candidate?.manifest || (values["manifest-file"] ? JSON.parse(await download(pathToFileURL(path2.resolve(values["manifest-file"])).href, { allowLocal: true, limit: 1024 * 1024 })) : JSON.parse(await download(values.version ? `https://github.com/${DOWNLOAD_REPOSITORY}/releases/download/v${values.version}/manifest.json` : STABLE_URL, { limit: 1024 * 1024 })));
+  assertManifest(manifest, { allowLocal, requireStable: !allowLocal });
   const target = `bun-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}`;
   if (!Object.hasOwn(TARGETS, target) || !manifest.artifacts[target])
     throw new Error("PLATFORM_NOT_SUPPORTED");
   if (values.check) {
     const current = await installedState(path2.resolve(values.dest));
+    const comparison = current ? compareVersions(manifest.version, current.version) : 1;
     console.log(JSON.stringify({
       status: "UPDATE_CHECKED",
       current: current?.version || null,
       available: manifest.version,
-      update_available: !current || compareVersions(manifest.version, current.version) > 0
+      update_available: comparison > 0 || comparison === 0 && current.archive_sha256 !== manifest.artifacts[target].sha256
     }));
     return;
   }
@@ -907,8 +972,8 @@ async function main(argv = process.argv.slice(2)) {
     workspace: values.workspace,
     skipDependencies: values["skip-dependencies"],
     allowDowngrade: values["allow-downgrade"],
-    allowLocal: Boolean(values["manifest-file"])
-  })));
+    allowLocal
+  }, candidate ? { fetchBytes: async () => candidate.bytes } : undefined)));
 }
 
 // delivery/installer-entry.mjs

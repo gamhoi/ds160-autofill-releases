@@ -39,6 +39,24 @@ identity, installs pinned Playwright/Chromium if necessary, and runs doctor befo
 activation. No system Chrome, Bun installation, account or product login is needed.
 Unsigned OS approval may be necessary; never disable system-wide protections.
 
+## Test an Explicit Local Candidate
+
+For pre-release testing, obtain the matching platform ZIP directly from the maintainer
+and use the same public installer above. Do not unzip it manually or create a manifest:
+
+```text
+node <downloaded-install.mjs> --candidate-archive <local-candidate.zip> --dest <absolute-test-skill-folder> --driver-dir <dedicated-driver-folder> --workspace <private-test-workspace>
+```
+
+This works even when stable.json has no release. Only an explicitly trusted local
+release ZIP is accepted; debug ZIPs and other-platform packages are rejected. The ZIP
+may be moved or renamed. Package checksums detect corruption, not authenticity of a
+self-contained candidate; verify any separately supplied SHA-256 with the maintainer.
+Do not combine this option with --version, --manifest-file or --rollback. Verify using
+the next section, then follow the installed SKILL.md for filling. Installation alone
+does not authorize a live application or submission. Normal installation and updates
+still use the approved stable release; testing does not publish or promote a candidate.
+
 ## Verify
 
 The installer must report INSTALLED or ALREADY_INSTALLED. Read the installed
