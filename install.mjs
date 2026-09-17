@@ -591,6 +591,12 @@ function inspectArchive(bytes, artifact, manifest) {
   const files = Object.fromEntries(Object.entries(zipped).map(([name, data]) => [name.slice("ds160-autofill/".length), Buffer.from(data)]));
   if (Object.keys(files).length !== expected.size)
     throw new Error("ARCHIVE_FILES_MISSING");
+  let extractedSize = 0;
+  for (const [name, bytes] of Object.entries(files)) {
+    extractedSize += bytes.length;
+    if (bytes.length > (name === artifact.executable ? 96 * 1024 * 1024 : 1024 * 1024) || extractedSize > 128 * 1024 * 1024)
+      throw new Error("ARCHIVE_TOO_LARGE");
+  }
   const lines = files.SHA256SUMS.toString("utf8").trim().split(`
 `);
   const checksummed = new Set;
@@ -603,12 +609,16 @@ function inspectArchive(bytes, artifact, manifest) {
   if (checksummed.size !== expected.size - 1)
     throw new Error("PACKAGE_CHECKSUMS_MISSING");
   const metadata = JSON.parse(files["release.json"]);
-  for (const key of ["version", "edition", "playwright", "profile_contract", "interaction_protocol", "schema_version"]) {
+  for (const key of ["version", "edition", "playwright", "profile_contract", "interaction_protocol", "schema_version", "minimum_node"]) {
     if (metadata[key] !== manifest[key])
       throw new Error(`PACKAGE_MANIFEST_MISMATCH: ${key}`);
   }
   if (metadata.build_id !== artifact.build_id || metadata.executable !== artifact.executable || metadata.protection !== "light-offline-obfuscation" || metadata.binary_sha256 !== sha256(files[artifact.executable]))
     throw new Error("PACKAGE_METADATA_INVALID");
+  const target = Object.keys(TARGETS).find((key) => artifact.filename === `ds160-autofill-${manifest.version}-${key}.zip`);
+  const definition = TARGETS[target];
+  if (!definition || metadata.platform !== definition.platform || metadata.arch !== definition.arch)
+    throw new Error("PACKAGE_PLATFORM_MISMATCH");
   return files;
 }
 async function listFiles(directory) {
