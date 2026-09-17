@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "profile_contract": 1,
+  "interaction_protocol": 1,
+  "edition": "free-b1b2",
+  "playwright": "1.62.1",
+  "minimum_node": 20,
+  "channel": "stable",
+  "release": null
+}

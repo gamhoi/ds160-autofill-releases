@@ -1,0 +1,7 @@
+{
+  "stable_count": 5,
+  "stable_days": 90,
+  "prerelease_days": 14,
+  "artifact_days": 7,
+  "pinned": []
+}
