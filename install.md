@@ -2,7 +2,28 @@
 
 This guide is an installation entrypoint for an Agent with local terminal, internet
 and GUI access. Installing the tool does not authorize filling or submitting an
-application. The binary edition is permanently free B1/B2, not an open-source engine.
+application. Personal B1/B2 use is permanently free; the binary engine is proprietary.
+There is no developer applicant-data backend. The installed LICENSE.txt contains the
+detailed terms and PRIVACY.md explains local files and CEAC data flow.
+
+## Copy to Your Agent
+
+Paste this prompt into the Agent that should use the Skill:
+
+```text
+Install or update the DS-160 B1/B2 Skill by following this guide:
+https://gamhoi.github.io/ds160-autofill-releases/install.md
+
+Use only the guide's official installer. Do not manually extract the package, run
+npx skills add for this product, or create duplicate copies. After installation,
+run doctor with --browser-test and generate a temporary template. Report the installed
+version, Skill directory, driver directory, workspace and verification results.
+```
+
+Use one installation method and one managed `ds160-autofill` directory per target
+Agent. If another copy exists, identify which installation owns it before changing
+anything. Do not combine this installer with a Claude marketplace, `npx skills`, or
+manual-copy installation of the same Skill.
 
 ## Environment
 
@@ -52,10 +73,25 @@ This works even when stable.json has no release. Only an explicitly trusted loca
 release ZIP is accepted; debug ZIPs and other-platform packages are rejected. The ZIP
 may be moved or renamed. Package checksums detect corruption, not authenticity of a
 self-contained candidate; verify any separately supplied SHA-256 with the maintainer.
-Do not combine this option with --version, --manifest-file or --rollback. Verify using
-the next section, then follow the installed SKILL.md for filling. Installation alone
+Do not combine this option with --version, --manifest-file, --rollback or --uninstall.
+Verify using the next section, then follow the installed SKILL.md for filling. Installation alone
 does not authorize a live application or submission. Normal installation and updates
 still use the approved stable release; testing does not publish or promote a candidate.
+
+## Test an Exact Public Preview
+
+A maintainer may publish a GitHub prerelease to test the real public download path
+without changing the default stable version. Use only the exact version supplied by
+the maintainer:
+
+```text
+node <downloaded-install.mjs> --version <preview-version> --dest <absolute-test-skill-folder> --driver-dir <dedicated-driver-folder> --workspace <private-test-workspace>
+```
+
+This downloads `manifest.json` and the matching platform ZIP from the official public
+GitHub Release, then performs the same checksum, identity, dependency and doctor
+checks as a stable install. Omitting `--version` still reads only stable.json. A public
+preview is not a stable release and must not be installed silently for ordinary users.
 
 ## Verify
 
@@ -92,3 +128,23 @@ from the Skill rollback. Applicant profiles, photos, diagnostics and PDFs are no
 Archived versions may no longer have downloadable ZIPs; choose a retained supported
 version instead. A checksum checks integrity, not publisher authenticity. Download
 only from the trusted publisher. Never send application material to installation support.
+
+## Uninstall
+
+Stop the runner and Chromium first, then use the same downloaded installer:
+
+```text
+node <install.mjs> --dest <skill-folder> --uninstall
+```
+
+The command removes only the checksum-verified managed Skill directory and its known
+rollback copy. It deliberately preserves the external driver directory, workspace,
+profiles, photos, diagnostics and saved PDFs, and reports their locations. If package
+files were changed or unknown files were placed inside the Skill, uninstall stops
+rather than deleting them. Move applicant material out and restore or reinstall the
+managed package before retrying. Remove preserved data separately only after the user
+identifies it and explicitly authorizes deletion.
+
+If filesystem locking prevents immediate cleanup after the managed directories have
+been detached, the result reports an `UNINSTALL_RESIDUAL_PRESERVED` warning and the
+exact residual path. Confirm no runner is active before removing only that path.
