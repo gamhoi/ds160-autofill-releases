@@ -426,7 +426,21 @@ function unzipSync(data, opts) {
 // delivery/release-contract.mjs
 var DOWNLOAD_REPOSITORY = "gamhoi/ds160-autofill-releases";
 var STABLE_URL = "https://gamhoi.github.io/ds160-autofill-releases/stable.json";
-var CONTRACT = Object.freeze({ schema_version: 1, profile_contract: 1, interaction_protocol: 1, edition: "free-b1b2", playwright: "1.62.1", minimum_node: 20 });
+var PRODUCT = Object.freeze({
+  product_id: "ds160-autofill",
+  product_uuid: "beb732f7-88f4-480e-8b8c-bc162a03596e",
+  license_id: "free-personal-v1",
+  license_sha256: "e1302fb9ad34ce08c21cfe767123a5df0c3ae3ba5e989e40230828689116e461"
+});
+var CONTRACT = Object.freeze({
+  schema_version: 2,
+  profile_contract: 1,
+  interaction_protocol: 1,
+  edition: "free-b1b2",
+  playwright: "1.62.1",
+  minimum_node: 20,
+  ...PRODUCT
+});
 var TARGETS = Object.freeze({
   "bun-darwin-x64": { platform: "darwin", arch: "x64", executable: "bin/ds160" },
   "bun-darwin-arm64": { platform: "darwin", arch: "arm64", executable: "bin/ds160" },
@@ -436,6 +450,8 @@ var PUBLIC_FILES = Object.freeze([
   "SKILL.md",
   "README.md",
   "install.md",
+  "LICENSE.txt",
+  "PRIVACY.md",
   "release.json",
   "SHA256SUMS",
   "THIRD_PARTY_NOTICES.txt",
@@ -450,6 +466,10 @@ function assertManifest(manifest, { allowLocal = false, requireStable = false } 
   if (manifest?.release === null)
     throw new Error("NO_STABLE_RELEASE: no approved public release is available yet.");
   for (const key of ["schema_version", "edition", "playwright", "profile_contract", "interaction_protocol", "minimum_node"]) {
+    if (manifest?.[key] !== CONTRACT[key])
+      throw new Error(`MANIFEST_INCOMPATIBLE: ${key}`);
+  }
+  for (const key of ["product_id", "product_uuid", "license_id", "license_sha256"]) {
     if (manifest?.[key] !== CONTRACT[key])
       throw new Error(`MANIFEST_INCOMPATIBLE: ${key}`);
   }
@@ -520,6 +540,19 @@ async function acquireInstallationLock(destination) {
   } catch (error) {
     if (error.code !== "EEXIST")
       throw error;
+    let owner;
+    try {
+      owner = JSON.parse(await readFile(path.join(directory, "owner.json"), "utf8"));
+    } catch {}
+    if (owner?.host === os.hostname() && Number.isInteger(owner.pid) && owner.pid > 0) {
+      try {
+        process.kill(owner.pid, 0);
+      } catch (probeError) {
+        if (probeError.code === "ESRCH") {
+          throw new Error(`INSTALLATION_STALE_LOCK: the recorded local owner pid=${owner.pid} has exited. Verify owner.json and that no installation or runner is active, then remove only ${directory} and retry. The lock was not automatically removed.`);
+        }
+      }
+    }
     throw new Error(`INSTALLATION_BUSY: installation or a runner holds ${directory}. Do not remove it until its owner has exited.`);
   }
   const token = randomUUID();
@@ -615,11 +648,11 @@ function inspectArchive(bytes, artifact, manifest) {
   if (checksummed.size !== expected.size - 1)
     throw new Error("PACKAGE_CHECKSUMS_MISSING");
   const metadata = JSON.parse(files["release.json"]);
-  for (const key of ["version", "edition", "playwright", "profile_contract", "interaction_protocol", "schema_version", "minimum_node"]) {
+  for (const key of ["version", ...Object.keys(CONTRACT)]) {
     if (metadata[key] !== manifest[key])
       throw new Error(`PACKAGE_MANIFEST_MISMATCH: ${key}`);
   }
-  if (metadata.build_id !== artifact.build_id || metadata.executable !== artifact.executable || metadata.protection !== "light-offline-obfuscation" || metadata.binary_sha256 !== sha256(files[artifact.executable]))
+  if (metadata.build_id !== artifact.build_id || metadata.executable !== artifact.executable || metadata.protection !== "light-offline-obfuscation" || metadata.binary_sha256 !== sha256(files[artifact.executable]) || !/^[a-f0-9]{64}$/.test(metadata.descriptor_fingerprint || ""))
     throw new Error("PACKAGE_METADATA_INVALID");
   const target = Object.keys(TARGETS).find((key) => artifact.filename === `ds160-autofill-${manifest.version}-${key}.zip`);
   const definition = TARGETS[target];
@@ -786,7 +819,7 @@ async function prepareDriver(executable, driver, workspace, skipDependencies, ex
     throw new Error("DRIVER_NOT_READY");
 }
 async function install(manifest, options, { execute = defaultExecute, fetchBytes = download, platform = process.platform, arch = process.arch } = {}) {
-  assertManifest(manifest, { allowLocal: Boolean(options.allowLocal), requireStable: !options.allowLocal });
+  assertManifest(manifest, { allowLocal: Boolean(options.allowLocal), requireStable: !options.allowLocal && !options.allowPrerelease });
   const target = `bun-${platform === "win32" ? "windows" : platform}-${arch}`;
   if (!Object.hasOwn(TARGETS, target) || !manifest.artifacts[target])
     throw new Error("PLATFORM_NOT_SUPPORTED");
@@ -904,6 +937,48 @@ async function rollback(destination, { execute = defaultExecute } = {}) {
     return { status: "ROLLED_BACK", version: state.version, destination };
   });
 }
+async function uninstall(destination) {
+  destination = path2.resolve(destination);
+  return withInstallationLock(destination, async () => {
+    const current = await installedState(destination);
+    if (!current)
+      return { status: "NOT_INSTALLED", destination };
+    const previous = previousDirectory(destination, current);
+    if (previous)
+      await installedState(previous);
+    const removals = [destination, ...previous ? [previous] : []].map((source) => ({
+      source,
+      quarantined: path2.join(path2.dirname(source), `.${path2.basename(source)}.removing-${randomUUID2()}`)
+    }));
+    const moved = [];
+    try {
+      for (const entry of removals) {
+        await rename(entry.source, entry.quarantined);
+        moved.push(entry);
+      }
+    } catch (error) {
+      for (const entry of moved.reverse())
+        await rename(entry.quarantined, entry.source).catch(() => {});
+      throw error;
+    }
+    const warnings = [];
+    for (const entry of removals) {
+      try {
+        await rm2(entry.quarantined, { recursive: true });
+      } catch {
+        warnings.push(`UNINSTALL_RESIDUAL_PRESERVED: ${entry.quarantined}`);
+      }
+    }
+    return {
+      status: "UNINSTALLED",
+      version: current.version,
+      destination,
+      preserved_driver_dir: current.driver_dir,
+      preserved_workspace: current.workspace,
+      warnings
+    };
+  });
+}
 async function main(argv = process.argv.slice(2)) {
   if (Number(process.versions.node.split(".")[0]) < CONTRACT.minimum_node)
     throw new Error("NODE_VERSION_UNSUPPORTED: use Node.js 20 or newer.");
@@ -918,6 +993,7 @@ async function main(argv = process.argv.slice(2)) {
     "allow-downgrade": { type: "boolean" },
     check: { type: "boolean" },
     rollback: { type: "boolean" },
+    uninstall: { type: "boolean" },
     help: { type: "boolean" }
   } });
   const seen = new Set;
@@ -928,8 +1004,8 @@ async function main(argv = process.argv.slice(2)) {
       seen.add(token.name);
     }
   if (values.help) {
-    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> [--driver-dir <dir>] [--workspace <dir>] [--version <version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback]
---candidate-archive installs an explicitly trusted local candidate, not a stable release. --skip-dependencies requires a working existing driver.`);
+    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> [--driver-dir <dir>] [--workspace <dir>] [--version <exact-public-version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback | --uninstall]
+An explicit --version may install a public preview release. Without it, only stable.json is used. --candidate-archive installs an explicitly trusted local candidate. --skip-dependencies requires a working existing driver. --uninstall removes only the managed Skill and retained rollback copy; it preserves driver and workspace data.`);
     return;
   }
   for (const key of ["version", "manifest-file", "candidate-archive"]) {
@@ -938,10 +1014,18 @@ async function main(argv = process.argv.slice(2)) {
   }
   if (!values.dest || !path2.isAbsolute(values.dest))
     throw new Error("DESTINATION_REQUIRED: provide the absolute target Agent Skill directory.");
-  if (values.rollback && (values.check || values.version || values["manifest-file"] || values["candidate-archive"]))
+  if ([values.check, values.rollback, values.uninstall].filter(Boolean).length > 1)
+    throw new Error("INVALID_ARGUMENT: choose one of check, rollback or uninstall");
+  if (values.rollback && (values.version || values["manifest-file"] || values["candidate-archive"]))
     throw new Error("INVALID_ARGUMENT: incompatible rollback options");
   if (values.rollback) {
     console.log(JSON.stringify(await rollback(values.dest)));
+    return;
+  }
+  if (values.uninstall) {
+    if (values.version || values["manifest-file"] || values["candidate-archive"] || values["driver-dir"] || values.workspace || values["skip-dependencies"] || values["allow-downgrade"])
+      throw new Error("INVALID_ARGUMENT: uninstall accepts only --dest");
+    console.log(JSON.stringify(await uninstall(values.dest)));
     return;
   }
   if (values.version && !validVersion(values.version))
@@ -951,7 +1035,9 @@ async function main(argv = process.argv.slice(2)) {
   const candidate = values["candidate-archive"] ? await candidateFromArchive(values["candidate-archive"]) : null;
   const allowLocal = Boolean(values["manifest-file"] || candidate);
   const manifest = candidate?.manifest || (values["manifest-file"] ? JSON.parse(await download(pathToFileURL(path2.resolve(values["manifest-file"])).href, { allowLocal: true, limit: 1024 * 1024 })) : JSON.parse(await download(values.version ? `https://github.com/${DOWNLOAD_REPOSITORY}/releases/download/v${values.version}/manifest.json` : STABLE_URL, { limit: 1024 * 1024 })));
-  assertManifest(manifest, { allowLocal, requireStable: !allowLocal });
+  if (values.version && manifest.version !== values.version)
+    throw new Error("MANIFEST_VERSION_MISMATCH");
+  assertManifest(manifest, { allowLocal, requireStable: !allowLocal && !values.version });
   const target = `bun-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}`;
   if (!Object.hasOwn(TARGETS, target) || !manifest.artifacts[target])
     throw new Error("PLATFORM_NOT_SUPPORTED");
@@ -966,13 +1052,15 @@ async function main(argv = process.argv.slice(2)) {
     }));
     return;
   }
+  console.error("DS-160 Autofill B1/B2: personal use is permanently free. No applicant data is uploaded to a developer backend; local files are sent only to CEAC and its official photo service when you perform filling. See LICENSE.txt and PRIVACY.md after installation.");
   console.log(JSON.stringify(await install(manifest, {
     destination: values.dest,
     driver: values["driver-dir"],
     workspace: values.workspace,
     skipDependencies: values["skip-dependencies"],
     allowDowngrade: values["allow-downgrade"],
-    allowLocal
+    allowLocal,
+    allowPrerelease: Boolean(values.version)
   }, candidate ? { fetchBytes: async () => candidate.bytes } : undefined)));
 }
 
