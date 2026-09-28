@@ -581,7 +581,11 @@ async function withInstallationLock(destination, action) {
 // delivery/installer.mjs
 var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 var STATE = "install-state.json";
-async function download(url, { allowLocal = false, limit = 128 * 1024 * 1024 } = {}) {
+async function download(url, {
+  allowLocal = false,
+  limit = 128 * 1024 * 1024,
+  timeoutMs = 60000
+} = {}) {
   const parsed = new URL(url);
   if (allowLocal && parsed.protocol === "file:") {
     const file = fileURLToPath(parsed);
@@ -597,18 +601,25 @@ async function download(url, { allowLocal = false, limit = 128 * 1024 * 1024 } =
   }
   if (parsed.protocol !== "https:" || parsed.username || parsed.password)
     throw new Error("DOWNLOAD_URL_INVALID");
-  const response = await fetch(parsed, { signal: AbortSignal.timeout(60000) });
-  if (!response.ok || !response.url.startsWith("https://"))
-    throw new Error(`DOWNLOAD_FAILED: HTTP ${response.status}`);
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of response.body) {
-    size += chunk.length;
-    if (size > limit)
-      throw new Error("DOWNLOAD_TOO_LARGE");
-    chunks.push(chunk);
+  try {
+    const response = await fetch(parsed, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok || !response.url.startsWith("https://"))
+      throw new Error(`DOWNLOAD_FAILED: HTTP ${response.status}`);
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of response.body) {
+      size += chunk.length;
+      if (size > limit)
+        throw new Error("DOWNLOAD_TOO_LARGE");
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw new Error(`DOWNLOAD_TIMEOUT: download did not complete within ${timeoutMs}ms`);
+    }
+    throw error;
   }
-  return Buffer.concat(chunks);
 }
 function inspectArchive(bytes, artifact, manifest) {
   if (bytes.length !== artifact.size || sha256(bytes) !== artifact.sha256)
@@ -840,7 +851,10 @@ async function install(manifest, options, { execute = defaultExecute, fetchBytes
       await prepareDriver(path2.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute);
       return { status: "ALREADY_INSTALLED", version: old.version, destination, driver_dir: driver, workspace };
     }
-    const files = inspectArchive(await fetchBytes(artifact.url, { allowLocal: options.allowLocal }), artifact, manifest);
+    const files = inspectArchive(await fetchBytes(artifact.url, {
+      allowLocal: options.allowLocal,
+      timeoutMs: 10 * 60000
+    }), artifact, manifest);
     const staging = path2.join(path2.dirname(destination), `.${path2.basename(destination)}.staging-${randomUUID2()}`);
     const backup = path2.join(path2.dirname(destination), `.${path2.basename(destination)}.previous-${randomUUID2()}`);
     let movedOld = false;
