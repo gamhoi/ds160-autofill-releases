@@ -1,0 +1,63 @@
+DS-160 AUTOFILL FREE PERSONAL USE LICENSE
+Version 1.0
+
+Copyright (c) 2026 DS-160 Autofill project. All rights reserved.
+
+1. Personal-use permission
+
+You may install, copy, and use the unmodified DS-160 Autofill B1/B2 binary Skill
+on any number of devices or Agent installations under your control, without a fee,
+to assist with your own visa application or an application for a family member.
+This permission is permanent for versions distributed under this license.
+
+2. Commercial use is not licensed
+
+This license does not permit use of the software to provide a paid or commercial
+service to third parties, including visa application preparation or agency services.
+It also does not permit selling, sublicensing, renting, hosting, white-labeling,
+embedding, or integrating the software into another commercial product or service.
+Contact the project through its GitHub repository if you have another use case or
+need to discuss permission.
+
+3. Distribution and modification
+
+You may make copies for your own permitted personal use. Do not publish, repackage,
+or distribute the software to third parties; direct them to the project's official
+GitHub release and installation guide. You may not remove or alter copyright,
+license, product-identity, or provenance notices. Modification, reverse engineering,
+or circumvention is not licensed except to the extent that applicable law does not
+allow that restriction.
+
+4. Applicant responsibility
+
+The software assists with transferring applicant-provided information. It does not
+provide legal or immigration advice, verify the truth of applicant facts, guarantee
+accuracy, or guarantee any visa result. The applicant remains responsible for all
+answers, Review confirmation, electronic signature, submission, and compliance with
+applicable law. The project is not affiliated with or endorsed by the United States
+Department of State.
+
+5. Data and third-party services
+
+The software has no developer-operated account, licensing, analytics, or applicant-
+data backend. Applicant data may be stored locally and is sent to CEAC and its
+official photo service when the user performs the corresponding filling operations.
+See PRIVACY.md for details. CEAC, GitHub, Node.js, npm, Playwright, Chromium, and
+other third-party services and components have their own terms and privacy practices.
+
+6. No warranty and limitation of liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+ACCURACY, AVAILABILITY, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY
+LAW, THE COPYRIGHT HOLDER AND CONTRIBUTORS ARE NOT LIABLE FOR ANY CLAIM, LOSS,
+DAMAGE, DELAY, REJECTION, DATA LOSS, OR OTHER LIABILITY ARISING FROM THE SOFTWARE
+OR ITS USE.
+
+7. Reservation and termination
+
+No rights are granted except those expressly stated above. The personal-use
+permission terminates if you materially violate this license. Provisions concerning
+ownership, responsibility, warranty, liability, and reserved rights survive.
+
+Questions and requests may be raised through the project's official GitHub repository.
