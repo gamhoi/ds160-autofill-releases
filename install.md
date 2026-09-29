@@ -107,6 +107,33 @@ Confirm the local browser test passes and the target Agent can discover the Skil
 reload its supported Skill mechanism if required. The generated intake is a reference,
 not a completed application. These checks must not create or submit a CEAC application.
 
+## Installation Diagnostics
+
+Do not run diagnostics before every normal installation. If installation or browser
+verification fails, download and inspect the public checker:
+
+https://gamhoi.github.io/ds160-autofill-releases/install-check.mjs
+
+It is a source-readable Node.js script and does not contain the proprietary runtime.
+Run a passive check against the same directories first:
+
+```text
+node <install-check.mjs> --output <new-report.json> --dest <skill-folder> --driver-dir <driver-folder> --workspace <workspace>
+```
+
+For a dedicated compatibility test machine, it can execute the already-inspected
+official installer and collect installation plus browser verification in one report:
+
+```text
+node <install-check.mjs> --output <new-report.json> --installer <install.mjs> --version <exact-preview-version> --dest <dedicated-test-skill> --driver-dir <dedicated-test-driver> --workspace <dedicated-test-workspace> --browser-test
+```
+
+Use new or explicitly disposable test directories for this second mode. It may install
+Playwright/Chromium and the selected Skill package, but it never creates, fills, signs
+or submits a DS-160 application. The report excludes applicant values, usernames,
+hostnames, absolute paths and raw logs. Review it before sharing. Do not upload a
+profile, photograph, browser profile or ordinary runtime log for installation support.
+
 ## Update and Roll Back
 
 ```text

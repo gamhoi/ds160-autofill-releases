@@ -7,6 +7,8 @@ Give your Agent this prompt:
 > official installer, then run its verification steps and report the result.
 
 See [install.md](install.md) for installation, update, rollback and safe uninstall.
+If installation fails, the public [install-check.mjs](install-check.mjs) can generate a
+value-free environment and installer report for review before sharing.
 This is a proprietary binary runtime and permanently free B1/B2 edition. No approved
 stable release is available until stable.json lists one.
 
