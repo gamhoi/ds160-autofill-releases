@@ -18,8 +18,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CHECKER_VERSION = '1.0.0';
-const REPORT_SCHEMA = 1;
+const CHECKER_VERSION = '1.1.0';
+const REPORT_SCHEMA = 2;
 const PLAYWRIGHT_VERSION = '1.62.1';
 const MINIMUM_NODE = 20;
 const MAX_CAPTURE_BYTES = 1024 * 1024;
@@ -289,7 +289,9 @@ async function inspectHost() {
     cpu_model: os.cpus()[0]?.model || null,
     memory_gib: Math.round((os.totalmem() / (1024 ** 3)) * 10) / 10,
     node: { version: process.versions.node, minimum: MINIMUM_NODE, supported: nodeMajor >= MINIMUM_NODE },
-    npm: await commandVersion(process.platform === 'win32' ? 'npm.cmd' : 'npm'),
+    npm: process.platform === 'win32'
+      ? await commandVersion(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm --version'])
+      : await commandVersion('npm'),
     process: {
       stdin_tty: Boolean(process.stdin.isTTY),
       stdout_tty: Boolean(process.stdout.isTTY),
@@ -377,13 +379,13 @@ async function inspectDriver(driver, paths) {
 async function inspectInstallation(destination) {
   if (!destination) return { provided: false };
   const root = path.resolve(destination);
-  const result = { provided: true, exists: false, state: null, release: null, checksums: { status: 'NOT_CHECKED' } };
+  const result = { provided: true, exists: false, managed: false, state: null, release: null, checksums: { status: 'NOT_CHECKED' } };
   try { if (!(await stat(root)).isDirectory()) return result; result.exists = true; }
   catch { return result; }
   try {
     const state = JSON.parse(await readFile(path.join(root, 'install-state.json'), 'utf8'));
     result.state = { version: state.version, target: state.target, archive_sha256: state.archive_sha256, previous_version: state.previous?.version || null };
-  } catch (error) { result.state_error = error.code || 'INVALID_JSON'; }
+  } catch (error) { if (error.code !== 'ENOENT') result.state_error = error.code || 'INVALID_JSON'; }
   try {
     const release = JSON.parse(await readFile(path.join(root, 'release.json'), 'utf8'));
     result.release = {
@@ -394,7 +396,9 @@ async function inspectInstallation(destination) {
       source_revision: release.source_revision,
       binary_sha256: release.binary_sha256,
     };
-  } catch (error) { result.release_error = error.code || 'INVALID_JSON'; }
+  } catch (error) { if (error.code !== 'ENOENT') result.release_error = error.code || 'INVALID_JSON'; }
+  result.managed = Boolean(result.state && result.release);
+  if (!result.managed) return result;
   try {
     const lines = (await readFile(path.join(root, 'SHA256SUMS'), 'utf8')).trim().split(/\r?\n/u);
     let checked = 0;
@@ -409,28 +413,41 @@ async function inspectInstallation(destination) {
   return result;
 }
 
-function deriveFindings(report) {
+export function deriveFindings(report) {
   const findings = [];
   const add = (severity, code, stage, detail) => findings.push({ severity, code, stage, detail });
   if (!report.host.supported_target) add('BLOCKER', 'PLATFORM_NOT_SUPPORTED', 'host', 'No published binary target matches this platform and architecture.');
   if (!report.host.node.supported) add('BLOCKER', 'NODE_VERSION_UNSUPPORTED', 'host', `Node.js ${MINIMUM_NODE} or newer is required.`);
   if (report.host.npm.status !== 'PASS') add('BLOCKER', 'NPM_UNAVAILABLE', 'host', 'npm could not be executed by the checker host.');
-  if (report.host.macos_host?.ps.status !== 'PASS') add('WARNING', 'PROCESS_ENUMERATION_UNAVAILABLE', 'macos-host', 'The host could not run the process enumeration used by macOS background browser ownership checks.');
-  if (report.host.macos_host?.launch_services.status !== 'AVAILABLE') add('BLOCKER', 'MACOS_LAUNCH_SERVICES_UNAVAILABLE', 'macos-host', 'The host could not execute the macOS open command.');
+  if (report.host.macos_host && report.host.macos_host.ps.status !== 'PASS') add('WARNING', 'PROCESS_ENUMERATION_UNAVAILABLE', 'macos-host', 'The host could not run the process enumeration used by macOS background browser ownership checks.');
+  if (report.host.macos_host && report.host.macos_host.launch_services.status !== 'AVAILABLE') add('BLOCKER', 'MACOS_LAUNCH_SERVICES_UNAVAILABLE', 'macos-host', 'The host could not execute the macOS open command.');
   for (const role of report.paths) {
     if (!role.provided) continue;
     if (!role.writable) add('BLOCKER', 'PATH_NOT_WRITABLE', role.role, `${role.role} or its nearest existing parent is not writable.`);
     if (role.classification !== 'local-or-unclassified') add('WARNING', 'PATH_MAY_NOT_BE_LOCAL', role.role, `${role.role} is classified as ${role.classification}; browser profiles and workspaces should use a local disk.`);
     if (Number.isFinite(role.free_bytes) && role.free_bytes < 3 * 1024 ** 3) add('WARNING', 'LOW_DISK_SPACE', role.role, `${role.role} has less than 3 GiB free.`);
   }
-  if (report.browser_cache.locks?.length) add('WARNING', 'PLAYWRIGHT_CACHE_LOCK_PRESENT', 'browser-cache', 'The Playwright browser cache contains one or more lock entries. Prove no installer is active before cleanup.');
-  const browserEntries = new Set(report.browser_cache.entries || []);
+  const beforeCache = report.before.browser_cache;
+  const browserCache = report.after.browser_cache;
+  if (browserCache.locks?.length) add('WARNING', 'PLAYWRIGHT_CACHE_LOCK_PRESENT', 'browser-cache', 'The Playwright browser cache contains one or more lock entries. Prove no installer is active before cleanup.');
+  const browserEntries = new Set(browserCache.entries || []);
   for (const entry of browserEntries) {
     const match = /^chromium-(\d+)$/u.exec(entry);
     if (match && !browserEntries.has(`chromium_headless_shell-${match[1]}`)) {
       add('WARNING', 'PLAYWRIGHT_BROWSER_PARTIAL', 'browser-cache', `Chromium revision ${match[1]} is present without the matching headless shell.`);
     }
   }
+  if (beforeCache.locks?.length && !browserCache.locks?.length) add('INFO', 'PLAYWRIGHT_CACHE_LOCK_CLEARED', 'browser-cache', 'A cache lock observed before installation was absent afterwards.');
+  const beforeEntries = new Set(beforeCache.entries || []);
+  const beforePartial = [...beforeEntries].some((entry) => {
+    const match = /^chromium-(\d+)$/u.exec(entry);
+    return match && !beforeEntries.has(`chromium_headless_shell-${match[1]}`);
+  });
+  const afterPartial = [...browserEntries].some((entry) => {
+    const match = /^chromium-(\d+)$/u.exec(entry);
+    return match && !browserEntries.has(`chromium_headless_shell-${match[1]}`);
+  });
+  if (beforePartial && !afterPartial) add('INFO', 'PLAYWRIGHT_BROWSER_REPAIRED', 'browser-cache', 'An incomplete shared browser revision observed before installation was complete afterwards.');
   if (Array.isArray(report.network)) {
     for (const endpoint of report.network) {
       if (endpoint.status !== 'PASS') add(endpoint.name === 'npm' ? 'BLOCKER' : 'WARNING', 'NETWORK_ENDPOINT_FAILED', `network:${endpoint.name}`, `${endpoint.host} returned ${endpoint.http_status || endpoint.error || endpoint.status}.`);
@@ -441,13 +458,16 @@ function deriveFindings(report) {
   else if (installer && installer.status !== 'PASS') add('BLOCKER', 'INSTALLER_EXERCISE_FAILED', 'installer', installer.result?.error || installer.summary || installer.error || 'The installer exited unsuccessfully.');
   const installed = report.after.installation;
   if (report.installer_exercise?.requested && !installed.exists) add('BLOCKER', 'INSTALLATION_NOT_ACTIVATED', 'installation', 'The installer exercise did not produce an active managed Skill directory.');
-  if (installed.exists && installed.checksums?.status !== 'PASS') add('BLOCKER', 'INSTALLATION_CHECKSUM_FAILED', 'installation', installed.checksums?.error || 'Installed package checksums did not verify.');
+  const unmanaged = report.before.installation.exists && !report.before.installation.managed;
+  if (unmanaged) add('BLOCKER', 'SKILL_DESTINATION_UNMANAGED', 'installation', 'The Skill destination already existed without managed installation metadata. First installation requires a destination path that does not yet exist.');
+  if (installed.managed && installed.checksums?.status !== 'PASS') add('BLOCKER', 'INSTALLATION_CHECKSUM_FAILED', 'installation', installed.checksums?.error || 'Installed package checksums did not verify.');
   const driver = report.after.driver;
   if (driver.provided && driver.playwright && driver.playwright !== PLAYWRIGHT_VERSION) add('BLOCKER', 'DRIVER_VERSION_MISMATCH', 'driver', `Expected Playwright ${PLAYWRIGHT_VERSION}, found ${driver.playwright}.`);
   if (driver.provided && driver.playwright && !driver.chromium.executable) add('BLOCKER', 'CHROMIUM_EXECUTABLE_UNAVAILABLE', 'driver', driver.chromium.error || 'Playwright resolved no executable Chromium.');
   const doctor = report.runtime_doctor?.execution;
   if (doctor?.status === 'TIMEOUT') add('BLOCKER', 'DOCTOR_TIMEOUT', 'runtime-doctor', 'doctor --browser-test exceeded five minutes.');
   else if (doctor && doctor.status !== 'PASS') add('BLOCKER', doctor.result?.error_code || 'DOCTOR_FAILED', 'runtime-doctor', doctor.result?.error || doctor.summary || doctor.error || 'doctor --browser-test failed.');
+  else if (report.runtime_doctor?.requested && report.runtime_doctor.status && report.runtime_doctor.status !== 'PASS') add('BLOCKER', report.runtime_doctor.status, 'runtime-doctor', report.runtime_doctor.error || 'The installed runtime executable was unavailable for doctor.');
   return findings;
 }
 
@@ -506,15 +526,20 @@ export async function createInstallReport(options) {
       inspectPathRole('driver', paths.driver),
       inspectPathRole('workspace', paths.workspace),
     ]),
-    browser_cache: await inspectBrowserCache(),
     network: options.network ? await Promise.all(Object.entries(OFFICIAL_URLS).map(([name, url]) => probeUrl(name, url))) : { skipped: true },
     before: {
+      browser_cache: await inspectBrowserCache(),
       installation: await inspectInstallation(paths.destination),
       driver: await inspectDriver(paths.driver, paths),
     },
   };
+  report.installation_context = {
+    skill_destination: report.before.installation.exists ? (report.before.installation.managed ? 'MANAGED' : 'EXISTS_UNMANAGED') : 'ABSENT',
+    browser_cache: report.before.browser_cache.entries?.length ? 'PRESENT' : 'EMPTY',
+  };
   report.installer_exercise = await exerciseInstaller(options, paths);
   report.after = {
+    browser_cache: await inspectBrowserCache(),
     installation: await inspectInstallation(paths.destination),
     driver: await inspectDriver(paths.driver, paths),
   };
@@ -522,7 +547,7 @@ export async function createInstallReport(options) {
   report.findings = deriveFindings(report);
   report.overall = report.findings.some((item) => item.severity === 'BLOCKER')
     ? 'FAIL'
-    : report.findings.length ? 'WARN' : 'PASS';
+    : report.findings.some((item) => item.severity === 'WARNING') ? 'WARN' : 'PASS';
   return redactValue(report, paths);
 }
 

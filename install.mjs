@@ -807,9 +807,33 @@ async function findNpmCli() {
       return file;
   throw new Error("NPM_NOT_FOUND: install Node.js with npm using install.md.");
 }
-var defaultExecute = (program, args) => execFileSync(program, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 360000, maxBuffer: 4 * 1024 * 1024 });
+var EXECUTION_TIMEOUTS = Object.freeze({
+  default: 6 * 60000,
+  doctor: 5 * 60000,
+  npm: 10 * 60000,
+  browser: 30 * 60000
+});
+var defaultExecute = (program, args, { timeoutMs = EXECUTION_TIMEOUTS.default } = {}) => execFileSync(program, args, {
+  encoding: "utf8",
+  stdio: ["ignore", "pipe", "pipe"],
+  timeout: timeoutMs,
+  maxBuffer: 4 * 1024 * 1024
+});
+function executeStage(execute, stage, program, args, timeoutMs) {
+  console.error(JSON.stringify({ status: "INSTALL_STAGE", stage, phase: "START" }));
+  try {
+    const output = execute(program, args, { timeoutMs, stage });
+    console.error(JSON.stringify({ status: "INSTALL_STAGE", stage, phase: "COMPLETE" }));
+    return output;
+  } catch (cause) {
+    const timedOut = cause?.code === "ETIMEDOUT" || /\bETIMEDOUT\b|timed out/iu.test(String(cause?.message || ""));
+    const code = timedOut ? `${stage}_TIMEOUT` : `${stage}_FAILED`;
+    const detail = timedOut ? `exceeded ${Math.round(timeoutMs / 60000)} minutes` : `dependency command exited unsuccessfully (${cause?.code || cause?.status || "unknown status"})`;
+    throw new Error(`${code}: ${detail}.`, { cause });
+  }
+}
 async function prepareDriver(executable, driver, workspace, skipDependencies, execute) {
-  const doctor = () => JSON.parse(execute(executable, ["doctor", "--driver-dir", driver, "--workspace", workspace]));
+  const doctor = () => JSON.parse(execute(executable, ["doctor", "--driver-dir", driver, "--workspace", workspace], { timeoutMs: EXECUTION_TIMEOUTS.doctor, stage: "DRIVER_CHECK" }));
   try {
     if (doctor().status === "READY")
       return;
@@ -824,12 +848,18 @@ async function prepareDriver(executable, driver, workspace, skipDependencies, ex
   await writeFile2(marker, `ds160-runtime
 `, { mode: 384 });
   const npm = await findNpmCli();
-  execute(process.execPath, [npm, "install", "--prefix", driver, "--save-exact", "--no-audit", "--no-fund", `playwright@${CONTRACT.playwright}`]);
-  execute(process.execPath, [path2.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"]);
+  executeStage(execute, "NPM_INSTALL", process.execPath, [npm, "install", "--prefix", driver, "--save-exact", "--no-audit", "--no-fund", `playwright@${CONTRACT.playwright}`], EXECUTION_TIMEOUTS.npm);
+  executeStage(execute, "BROWSER_INSTALL", process.execPath, [path2.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
   if (doctor().status !== "READY")
     throw new Error("DRIVER_NOT_READY");
 }
-async function install(manifest, options, { execute = defaultExecute, fetchBytes = download, platform = process.platform, arch = process.arch } = {}) {
+async function install(manifest, options, {
+  execute = defaultExecute,
+  fetchBytes = download,
+  platform = process.platform,
+  arch = process.arch,
+  remove = rm2
+} = {}) {
   assertManifest(manifest, { allowLocal: Boolean(options.allowLocal), requireStable: !options.allowLocal && !options.allowPrerelease });
   const target = `bun-${platform === "win32" ? "windows" : platform}-${arch}`;
   if (!Object.hasOwn(TARGETS, target) || !manifest.artifacts[target])
@@ -859,6 +889,7 @@ async function install(manifest, options, { execute = defaultExecute, fetchBytes
     const backup = path2.join(path2.dirname(destination), `.${path2.basename(destination)}.previous-${randomUUID2()}`);
     let movedOld = false;
     let activated = false;
+    let primaryError = null;
     try {
       await mkdir2(staging, { mode: 448 });
       for (const [relative, bytes] of Object.entries(files)) {
@@ -909,11 +940,23 @@ async function install(manifest, options, { execute = defaultExecute, fetchBytes
       }
       return { status: "INSTALLED", version: manifest.version, destination, driver_dir: driver, workspace, previous_version: old?.version, warnings };
     } catch (error) {
+      primaryError = error;
       if (movedOld && !activated)
         await rename(backup, destination);
       throw error;
     } finally {
-      await rm2(staging, { recursive: true, force: true });
+      if (!activated) {
+        try {
+          await remove(staging, { recursive: true, force: true });
+        } catch (cleanupError) {
+          if (primaryError) {
+            primaryError.message = `${primaryError.message} STAGING_CLEANUP_FAILED: partial staging data may remain; the original installation error is preserved.`;
+            primaryError.cleanupError = cleanupError;
+          } else {
+            throw new Error("STAGING_CLEANUP_FAILED: partial staging data may remain.", { cause: cleanupError });
+          }
+        }
+      }
     }
   });
 }

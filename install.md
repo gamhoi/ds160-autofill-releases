@@ -45,6 +45,8 @@ Choose the target Agent's supported Skill directory, with this Skill's own folde
 named ds160-autofill. Use absolute paths. Do not overwrite unrelated rules/config or
 assume all Agents share a directory. If the client has no compatible Skill loading
 mechanism, report it. Keep driver, workspace and applicant materials outside this folder.
+For a first installation, create the parent directory if needed but do not pre-create
+the final `--dest` directory; it must not exist until the managed installer activates it.
 
 Download and inspect the public installer from:
 https://gamhoi.github.io/ds160-autofill-releases/install.mjs
@@ -128,8 +130,9 @@ official installer and collect installation plus browser verification in one rep
 node <install-check.mjs> --output <new-report.json> --installer <install.mjs> --version <exact-preview-version> --dest <dedicated-test-skill> --driver-dir <dedicated-test-driver> --workspace <dedicated-test-workspace> --browser-test
 ```
 
-Use new or explicitly disposable test directories for this second mode. It may install
-Playwright/Chromium and the selected Skill package, but it never creates, fills, signs
+Create only their common parent directory. The `--dest` path itself must not exist;
+the installer creates it atomically. The driver and workspace paths may be absent or
+empty dedicated directories. This mode may install Playwright/Chromium and the selected Skill package, but it never creates, fills, signs
 or submits a DS-160 application. The report excludes applicant values, usernames,
 hostnames, absolute paths and raw logs. Review it before sharing. Do not upload a
 profile, photograph, browser profile or ordinary runtime log for installation support.
