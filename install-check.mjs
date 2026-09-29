@@ -2,7 +2,7 @@
 
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { constants } from 'node:fs';
+import { constants, realpathSync } from 'node:fs';
 import {
   access,
   mkdir,
@@ -543,7 +543,11 @@ export async function main(argv = process.argv.slice(2)) {
   return 0;
 }
 
-const invoked = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const invoked = (() => {
+  if (!process.argv[1]) return false;
+  try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); }
+  catch { return path.resolve(process.argv[1]) === fileURLToPath(import.meta.url); }
+})();
 if (invoked) {
   try { process.exitCode = await main(); }
   catch (error) {
