@@ -132,7 +132,9 @@ node <install-check.mjs> --output <new-report.json> --installer <install.mjs> --
 
 Create only their common parent directory. The `--dest` path itself must not exist;
 the installer creates it atomically. The driver and workspace paths may be absent or
-empty dedicated directories. This mode may install Playwright/Chromium and the selected Skill package, but it never creates, fills, signs
+empty dedicated directories. The checker forwards value-free `INSTALL_STAGE` progress
+events while npm and Chromium dependencies are installed. This mode may install
+Playwright/Chromium and the selected Skill package, but it never creates, fills, signs
 or submits a DS-160 application. The report excludes applicant values, usernames,
 hostnames, absolute paths and raw logs. Review it before sharing. Do not upload a
 profile, photograph, browser profile or ordinary runtime log for installation support.

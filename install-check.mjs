@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CHECKER_VERSION = '1.1.0';
+const CHECKER_VERSION = '1.2.0';
 const REPORT_SCHEMA = 2;
 const PLAYWRIGHT_VERSION = '1.62.1';
 const MINIMUM_NODE = 20;
@@ -155,13 +155,19 @@ function lastJson(text) {
   return null;
 }
 
-async function runProcess(program, args, { timeoutMs = 30_000, paths = {}, env = process.env } = {}) {
+async function runProcess(program, args, {
+  timeoutMs = 30_000,
+  paths = {},
+  env = process.env,
+  forwardInstallStages = false,
+} = {}) {
   const started = Date.now();
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
     let settled = false;
     let timedOut = false;
+    let stderrLineBuffer = '';
     let child;
     try {
       child = spawn(program, args, {
@@ -183,7 +189,19 @@ async function runProcess(program, args, { timeoutMs = 30_000, paths = {}, env =
     }
     const append = (current, chunk) => (current + chunk).slice(-MAX_CAPTURE_BYTES);
     child.stdout.on('data', (chunk) => { stdout = append(stdout, chunk); });
-    child.stderr.on('data', (chunk) => { stderr = append(stderr, chunk); });
+    child.stderr.on('data', (chunk) => {
+      stderr = append(stderr, chunk);
+      if (!forwardInstallStages) return;
+      stderrLineBuffer += chunk;
+      const lines = stderrLineBuffer.split(/\r?\n/u);
+      stderrLineBuffer = lines.pop() || '';
+      for (const line of lines) {
+        try {
+          const event = JSON.parse(line);
+          if (event?.status === 'INSTALL_STAGE') console.error(JSON.stringify(event));
+        } catch {}
+      }
+    });
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill();
@@ -482,7 +500,11 @@ async function exerciseInstaller(options, paths) {
     requested: true,
     installer_sha256: installerHash,
     invocation: options.candidateArchive ? 'candidate' : options.version ? 'exact-preview' : 'stable',
-    execution: await runProcess(process.execPath, args, { timeoutMs: 40 * 60_000, paths }),
+    execution: await runProcess(process.execPath, args, {
+      timeoutMs: 40 * 60_000,
+      paths,
+      forwardInstallStages: true,
+    }),
   };
 }
 

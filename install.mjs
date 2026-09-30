@@ -827,16 +827,22 @@ function executeStage(execute, stage, program, args, timeoutMs) {
     return output;
   } catch (cause) {
     const timedOut = cause?.code === "ETIMEDOUT" || /\bETIMEDOUT\b|timed out/iu.test(String(cause?.message || ""));
-    const code = timedOut ? `${stage}_TIMEOUT` : `${stage}_FAILED`;
-    const detail = timedOut ? `exceeded ${Math.round(timeoutMs / 60000)} minutes` : `dependency command exited unsuccessfully (${cause?.code || cause?.status || "unknown status"})`;
-    throw new Error(`${code}: ${detail}.`, { cause });
+    const commandOutput = [cause?.message, cause?.stdout, cause?.stderr].filter(Boolean).join(`
+`);
+    const lockCleanupFailed = /__dirlock/iu.test(commandOutput) && /\b(?:EPERM|EACCES|ENOTEMPTY)\b|operation not permitted|safe[-_ ]?delete|\brmdir\b/iu.test(commandOutput);
+    const code = timedOut ? `${stage}_TIMEOUT` : lockCleanupFailed ? `${stage}_CACHE_LOCK_CLEANUP_FAILED` : `${stage}_FAILED`;
+    const detail = timedOut ? `exceeded ${Math.round(timeoutMs / 60000)} minutes` : lockCleanupFailed ? "browser assets may be complete, but the shared cache lock could not be released" : `dependency command exited unsuccessfully (${cause?.code || cause?.status || "unknown status"})`;
+    const error = new Error(`${code}: ${detail}.`, { cause });
+    error.errorCode = code;
+    throw error;
   }
 }
 async function prepareDriver(executable, driver, workspace, skipDependencies, execute) {
+  const warnings = [];
   const doctor = () => JSON.parse(execute(executable, ["doctor", "--driver-dir", driver, "--workspace", workspace], { timeoutMs: EXECUTION_TIMEOUTS.doctor, stage: "DRIVER_CHECK" }));
   try {
     if (doctor().status === "READY")
-      return;
+      return warnings;
   } catch {}
   if (skipDependencies)
     throw new Error("DRIVER_NOT_READY: --skip-dependencies requires an already working driver.");
@@ -849,9 +855,23 @@ async function prepareDriver(executable, driver, workspace, skipDependencies, ex
 `, { mode: 384 });
   const npm = await findNpmCli();
   executeStage(execute, "NPM_INSTALL", process.execPath, [npm, "install", "--prefix", driver, "--save-exact", "--no-audit", "--no-fund", `playwright@${CONTRACT.playwright}`], EXECUTION_TIMEOUTS.npm);
-  executeStage(execute, "BROWSER_INSTALL", process.execPath, [path2.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
+  try {
+    executeStage(execute, "BROWSER_INSTALL", process.execPath, [path2.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
+  } catch (error) {
+    let ready = false;
+    try {
+      ready = doctor().status === "READY";
+    } catch {}
+    if (!ready)
+      throw error;
+    const code = error.errorCode || "BROWSER_INSTALL_FAILED";
+    warnings.push(`${code}_BUT_DRIVER_READY: browser assets passed the runtime dependency check; run doctor --browser-test before filling.`);
+    console.error(JSON.stringify({ status: "INSTALL_STAGE", stage: "BROWSER_INSTALL", phase: "VERIFIED_AFTER_FAILURE", warning: code }));
+    return warnings;
+  }
   if (doctor().status !== "READY")
     throw new Error("DRIVER_NOT_READY");
+  return warnings;
 }
 async function install(manifest, options, {
   execute = defaultExecute,
@@ -878,8 +898,8 @@ async function install(manifest, options, {
     outside(destination, workspace);
     const artifact = manifest.artifacts[target];
     if (old?.archive_sha256 === artifact.sha256 && old.driver_dir === driver && old.workspace === workspace) {
-      await prepareDriver(path2.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute);
-      return { status: "ALREADY_INSTALLED", version: old.version, destination, driver_dir: driver, workspace };
+      const warnings = await prepareDriver(path2.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute);
+      return { status: "ALREADY_INSTALLED", version: old.version, destination, driver_dir: driver, workspace, warnings };
     }
     const files = inspectArchive(await fetchBytes(artifact.url, {
       allowLocal: options.allowLocal,
@@ -903,7 +923,7 @@ async function install(manifest, options, {
       const version = JSON.parse(execute(executable, ["version"]));
       if (version.version !== manifest.version || version.build_id !== artifact.build_id)
         throw new Error("BINARY_IDENTITY_MISMATCH");
-      await prepareDriver(executable, driver, workspace, options.skipDependencies, execute);
+      const driverWarnings = await prepareDriver(executable, driver, workspace, options.skipDependencies, execute);
       const state = {
         schema_version: 1,
         tool: "ds160-runtime",
@@ -929,7 +949,7 @@ async function install(manifest, options, {
       await rename(staging, destination);
       activated = true;
       const older = previousDirectory(destination, old);
-      const warnings = [];
+      const warnings = [...driverWarnings];
       if (older) {
         try {
           await installedState(older);
