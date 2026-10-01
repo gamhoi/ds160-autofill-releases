@@ -108,11 +108,21 @@ SKILL.md, locate bin/ds160 (macOS) or bin/ds160.exe (Windows), then run:
 Confirm the local browser test passes and the target Agent can discover the Skill;
 reload its supported Skill mechanism if required. The generated intake is a reference,
 not a completed application. These checks must not create or submit a CEAC application.
+On macOS, a positively identified WorkBuddy host sandbox is handled automatically:
+the host sandbox remains enabled while the dedicated Chrome for Testing process uses
+`HOST_SANDBOX_COMPAT` and loopback CDP. Real runs use the dedicated workspace browser
+profile; the synthetic doctor test uses one non-applicant profile in the user's system
+temporary area so normal Chromium housekeeping does not conflict with workspace deletion
+guards. No user setting needs to be disabled. For an unrecognized sandbox,
+`SECURE_BROWSER_LAUNCH_REQUIRES_HOST_PERMISSION`
+still means the host blocked the secure no-activate launcher; rerun the same doctor
+command with that host's GUI-capable or unrestricted local-execution permission.
 
 ## Installation Diagnostics
 
-Do not run diagnostics before every normal installation. If installation or browser
-verification fails, download and inspect the public checker:
+Do not run diagnostics during a normal successful installation. If installation or
+browser verification fails and the error itself does not already identify a host GUI
+permission requirement, download and inspect the public checker:
 
 https://gamhoi.github.io/ds160-autofill-releases/install-check.mjs
 
