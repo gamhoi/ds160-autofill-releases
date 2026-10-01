@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const CHECKER_VERSION = '1.2.0';
+const CHECKER_VERSION = '1.3.0';
 const REPORT_SCHEMA = 2;
 const PLAYWRIGHT_VERSION = '1.62.1';
 const MINIMUM_NODE = 20;
@@ -317,19 +317,6 @@ async function inspectHost() {
       ssh: Boolean(process.env.SSH_CONNECTION || process.env.SSH_TTY),
     },
   };
-  if (process.platform === 'darwin') {
-    const launchServicesProbe = await runProcess('open', ['-h'], { timeoutMs: 5_000 });
-    report.macos_host = {
-      ps: await runProcess('ps', ['-axo', 'pid=,command='], { timeoutMs: 5_000 }).then(({ status, duration_ms }) => ({ status, duration_ms })),
-      launch_services: {
-        status: launchServicesProbe.status === 'SPAWN_ERROR' ? 'UNAVAILABLE' : 'AVAILABLE',
-        probe_status: launchServicesProbe.status,
-        duration_ms: launchServicesProbe.duration_ms,
-      },
-      appkit: await runProcess('osascript', ['-l', 'JavaScript', '-e', 'ObjC.import("AppKit"); JSON.stringify({screens:Number($.NSScreen.screens.count), frontmost:Boolean($.NSWorkspace.sharedWorkspace.frontmostApplication)})'], { timeoutMs: 10_000 })
-        .then(({ status, duration_ms, summary }) => ({ status, duration_ms, available: status === 'PASS', detail: summary ? redactText(summary) : undefined })),
-    };
-  }
   if (process.platform === 'win32') {
     report.windows_host = {
       powershell: await commandVersion('powershell.exe', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()']),
@@ -437,8 +424,6 @@ export function deriveFindings(report) {
   if (!report.host.supported_target) add('BLOCKER', 'PLATFORM_NOT_SUPPORTED', 'host', 'No published binary target matches this platform and architecture.');
   if (!report.host.node.supported) add('BLOCKER', 'NODE_VERSION_UNSUPPORTED', 'host', `Node.js ${MINIMUM_NODE} or newer is required.`);
   if (report.host.npm.status !== 'PASS') add('BLOCKER', 'NPM_UNAVAILABLE', 'host', 'npm could not be executed by the checker host.');
-  if (report.host.macos_host && report.host.macos_host.ps.status !== 'PASS') add('WARNING', 'PROCESS_ENUMERATION_UNAVAILABLE', 'macos-host', 'The host could not run the process enumeration used by macOS background browser ownership checks.');
-  if (report.host.macos_host && report.host.macos_host.launch_services.status !== 'AVAILABLE') add('BLOCKER', 'MACOS_LAUNCH_SERVICES_UNAVAILABLE', 'macos-host', 'The host could not execute the macOS open command.');
   for (const role of report.paths) {
     if (!role.provided) continue;
     if (!role.writable) add('BLOCKER', 'PATH_NOT_WRITABLE', role.role, `${role.role} or its nearest existing parent is not writable.`);
