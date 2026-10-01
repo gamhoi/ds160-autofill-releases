@@ -25,7 +25,7 @@ SOFTWARE.
 // delivery/installer.mjs
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID as randomUUID2 } from "node:crypto";
-import { chmod, lstat, mkdir as mkdir2, readFile as readFile2, readdir, realpath, rename, rm as rm2, stat, writeFile as writeFile2 } from "node:fs/promises";
+import { chmod, lstat, mkdir as mkdir2, readFile as readFile2, readdir, realpath, rename as rename2, rm as rm2, stat, writeFile as writeFile2 } from "node:fs/promises";
 import path2 from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -525,14 +525,45 @@ function compareVersions(left, right) {
 }
 
 // delivery/install-lock.mjs
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, rmdir, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 function installationLockPath(destination) {
   return path.join(path.dirname(destination), `.${path.basename(destination)}-operation.lock`);
 }
-async function acquireInstallationLock(destination) {
+function localOwnerAlive(owner) {
+  if (owner?.host !== os.hostname() || !Number.isInteger(owner.pid) || owner.pid < 1)
+    return null;
+  try {
+    process.kill(owner.pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "ESRCH" ? false : true;
+  }
+}
+async function inspectInstallationLock(destination) {
+  const directory = installationLockPath(destination);
+  let owner;
+  try {
+    owner = JSON.parse(await readFile(path.join(directory, "owner.json"), "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT")
+      return { state: "ABSENT" };
+    return { state: "UNKNOWN" };
+  }
+  const alive = localOwnerAlive(owner);
+  if (alive === false)
+    return { state: "STALE", owner };
+  if (alive === true)
+    return { state: "ACTIVE", owner };
+  return { state: "UNKNOWN", owner };
+}
+async function acquireInstallationLock(destination, {
+  remove = rm,
+  unlinkFile = unlink,
+  removeDirectory = rmdir
+} = {}) {
   const directory = installationLockPath(destination);
   await mkdir(path.dirname(directory), { recursive: true });
   try {
@@ -540,18 +571,9 @@ async function acquireInstallationLock(destination) {
   } catch (error) {
     if (error.code !== "EEXIST")
       throw error;
-    let owner;
-    try {
-      owner = JSON.parse(await readFile(path.join(directory, "owner.json"), "utf8"));
-    } catch {}
-    if (owner?.host === os.hostname() && Number.isInteger(owner.pid) && owner.pid > 0) {
-      try {
-        process.kill(owner.pid, 0);
-      } catch (probeError) {
-        if (probeError.code === "ESRCH") {
-          throw new Error(`INSTALLATION_STALE_LOCK: the recorded local owner pid=${owner.pid} has exited. Verify owner.json and that no installation or runner is active, then remove only ${directory} and retry. The lock was not automatically removed.`);
-        }
-      }
+    const inspection = await inspectInstallationLock(destination);
+    if (inspection.state === "STALE") {
+      throw new Error(`INSTALLATION_STALE_LOCK: the recorded local owner pid=${inspection.owner.pid} has exited. Verify owner.json and that no installation or runner is active, then remove only ${directory} and retry. The lock was not automatically removed.`);
     }
     throw new Error(`INSTALLATION_BUSY: installation or a runner holds ${directory}. Do not remove it until its owner has exited.`);
   }
@@ -559,23 +581,61 @@ async function acquireInstallationLock(destination) {
   try {
     await writeFile(path.join(directory, "owner.json"), JSON.stringify({ token, pid: process.pid, host: os.hostname(), started_at: new Date().toISOString() }), { mode: 384, flag: "wx" });
   } catch (error) {
-    await rm(directory, { recursive: true, force: true });
+    try {
+      await remove(directory, { recursive: true, force: true });
+    } catch (cleanupError) {
+      error.lock_cleanup_error = cleanupError.message;
+    }
     throw error;
   }
   return async () => {
     const owner = JSON.parse(await readFile(path.join(directory, "owner.json"), "utf8"));
     if (owner.token !== token)
       throw new Error("INSTALLATION_LOCK_CHANGED");
-    await rm(directory, { recursive: true });
+    const released = `${directory}.released-${token}`;
+    try {
+      await rename(directory, released);
+    } catch (cause) {
+      throw new Error("INSTALLATION_LOCK_RELEASE_FAILED: the completed operation could not release its canonical lock. " + "Verify the recorded owner has exited before removing only the reported lock directory.", { cause });
+    }
+    try {
+      await remove(released, { recursive: true, force: true });
+      return null;
+    } catch {
+      try {
+        await unlinkFile(path.join(released, "owner.json"));
+        await removeDirectory(released);
+        return null;
+      } catch {}
+      return {
+        warning_code: "INSTALLATION_LOCK_CLEANUP_DEFERRED",
+        message: "The canonical operation lock was released, but its inert cleanup directory remains."
+      };
+    }
   };
 }
 async function withInstallationLock(destination, action) {
   const release = await acquireInstallationLock(destination);
+  let result;
+  let actionError;
   try {
-    return await action();
-  } finally {
-    await release();
+    result = await action();
+  } catch (error) {
+    actionError = error;
   }
+  try {
+    const warning = await release();
+    if (warning)
+      process.stderr.write(`${JSON.stringify({ status: "WARNING", ...warning })}
+`);
+  } catch (releaseError) {
+    if (!actionError)
+      throw releaseError;
+    actionError.lock_release_error = releaseError.message;
+  }
+  if (actionError)
+    throw actionError;
+  return result;
 }
 
 // delivery/installer.mjs
@@ -777,7 +837,7 @@ async function replaceState(directory, bytes) {
   const temporary = path2.join(directory, `.install-state-${randomUUID2()}`);
   try {
     await writeFile2(temporary, bytes, { mode: 384, flag: "wx" });
-    await rename(temporary, path2.join(directory, STATE));
+    await rename2(temporary, path2.join(directory, STATE));
   } finally {
     await rm2(temporary, { force: true });
   }
@@ -855,6 +915,12 @@ async function prepareDriver(executable, driver, workspace, skipDependencies, ex
 `, { mode: 384 });
   const npm = await findNpmCli();
   executeStage(execute, "NPM_INSTALL", process.execPath, [npm, "install", "--prefix", driver, "--save-exact", "--no-audit", "--no-fund", `playwright@${CONTRACT.playwright}`], EXECUTION_TIMEOUTS.npm);
+  try {
+    if (doctor().status === "READY") {
+      console.error(JSON.stringify({ status: "INSTALL_STAGE", stage: "BROWSER_INSTALL", phase: "VERIFIED_EXISTING" }));
+      return warnings;
+    }
+  } catch {}
   try {
     executeStage(execute, "BROWSER_INSTALL", process.execPath, [path2.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
   } catch (error) {
@@ -943,10 +1009,10 @@ async function install(manifest, options, {
         const fresh = await installedState(destination);
         if (fresh.archive_sha256 !== old.archive_sha256)
           throw new Error("INSTALLATION_CHANGED");
-        await rename(destination, backup);
+        await rename2(destination, backup);
         movedOld = true;
       }
-      await rename(staging, destination);
+      await rename2(staging, destination);
       activated = true;
       const older = previousDirectory(destination, old);
       const warnings = [...driverWarnings];
@@ -962,7 +1028,7 @@ async function install(manifest, options, {
     } catch (error) {
       primaryError = error;
       if (movedOld && !activated)
-        await rename(backup, destination);
+        await rename2(backup, destination);
       throw error;
     } finally {
       if (!activated) {
@@ -1002,12 +1068,12 @@ async function rollback(destination, { execute = defaultExecute } = {}) {
 `);
     let moved = false;
     try {
-      await rename(destination, backup);
+      await rename2(destination, backup);
       moved = true;
-      await rename(previous, destination);
+      await rename2(previous, destination);
     } catch (error) {
       if (moved)
-        await rename(backup, destination);
+        await rename2(backup, destination);
       await replaceState(previous, originalState);
       throw error;
     }
@@ -1030,12 +1096,12 @@ async function uninstall(destination) {
     const moved = [];
     try {
       for (const entry of removals) {
-        await rename(entry.source, entry.quarantined);
+        await rename2(entry.source, entry.quarantined);
         moved.push(entry);
       }
     } catch (error) {
       for (const entry of moved.reverse())
-        await rename(entry.quarantined, entry.source).catch(() => {});
+        await rename2(entry.quarantined, entry.source).catch(() => {});
       throw error;
     }
     const warnings = [];
