@@ -450,6 +450,8 @@ var PUBLIC_FILES = Object.freeze([
   "SKILL.md",
   "README.md",
   "install.md",
+  "ARCHITECTURE.md",
+  "SECURITY.md",
   "LICENSE.txt",
   "PRIVACY.md",
   "release.json",
