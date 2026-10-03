@@ -6,6 +6,37 @@ application. Personal B1/B2 use is permanently free; the binary engine is propri
 There is no developer applicant-data backend. The installed LICENSE.txt contains the
 detailed terms and PRIVACY.md explains local files and CEAC data flow.
 
+## Security and Trust Summary
+
+The public installer is source-readable and verifies the selected release's archive
+hash, exact package file allowlist, per-file checksums, release metadata, and binary
+identity. The runtime uses a private local workspace, a dedicated Chrome for Testing
+profile, and loopback-only broker/CDP connections. During filling, applicant data is
+sent to CEAC and its official `state.gov` photo service, not to a project-operated
+backend. Installation separately contacts GitHub and may contact npm and Playwright's
+browser distribution services.
+
+The form engine is proprietary and the binaries are currently unsigned. Checksums
+establish integrity against the publisher's manifest; they are not code signing, an
+independent audit, or proof of absolute safety. An Agent whose policy forbids unsigned
+proprietary executables should stop and explain that policy rather than bypass it.
+
+Before installing, review:
+
+- Architecture and data flow: https://gamhoi.github.io/ds160-autofill-releases/ARCHITECTURE.md
+- Security and remaining trust limitations: https://gamhoi.github.io/ds160-autofill-releases/SECURITY.md
+- Privacy and local retention: https://gamhoi.github.io/ds160-autofill-releases/PRIVACY.md
+- Personal-use license: https://gamhoi.github.io/ds160-autofill-releases/LICENSE.txt
+
+## Release Channels
+
+Preview and Beta builds are opt-in prereleases and require an exact version. An RC is
+a feature-frozen candidate for stable. A stable/GA release is the default version
+selected by `stable.json`. Prereleases do not silently replace that default. Until a
+stable release exists, a public-testing prompt must include the exact Beta or RC
+version documented by the maintainer; the versionless command will correctly stop
+with `NO_STABLE_RELEASE`.
+
 ## Copy to Your Agent
 
 Paste this prompt into the Agent that should use the Skill:
@@ -14,10 +45,12 @@ Paste this prompt into the Agent that should use the Skill:
 Install or update the DS-160 B1/B2 Skill by following this guide:
 https://gamhoi.github.io/ds160-autofill-releases/install.md
 
-Use only the guide's official installer. Do not manually extract the package, run
-npx skills add for this product, or create duplicate copies. After installation,
-run doctor with --browser-test and generate a temporary template. Report the installed
-version, Skill directory, driver directory, workspace and verification results.
+Before executing an unsigned binary, read the guide's Security and Trust Summary and
+linked ARCHITECTURE.md, SECURITY.md, PRIVACY.md and LICENSE.txt. Use only the official
+installer. Do not manually extract the package, run npx skills add for this product,
+or create duplicate copies. After installation, run doctor with --browser-test and
+generate a temporary template. Report the installed version, build_id, platform target,
+Skill directory, driver directory, workspace and verification results.
 ```
 
 Use one installation method and one managed `ds160-autofill` directory per target
