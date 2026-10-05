@@ -9,32 +9,33 @@
   "product_uuid": "beb732f7-88f4-480e-8b8c-bc162a03596e",
   "license_id": "free-personal-v1",
   "license_sha256": "e1302fb9ad34ce08c21cfe767123a5df0c3ae3ba5e989e40230828689116e461",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "channel": "stable",
   "artifacts": {
     "bun-darwin-x64": {
-      "filename": "ds160-autofill-0.3.0-bun-darwin-x64.zip",
-      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.0/ds160-autofill-0.3.0-bun-darwin-x64.zip",
-      "sha256": "566baab22efce1d440b080ffc25e58737b23f31494ada89dbb37c57b6e4cdba4",
-      "size": 29192447,
+      "filename": "ds160-autofill-0.3.1-bun-darwin-x64.zip",
+      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.1/ds160-autofill-0.3.1-bun-darwin-x64.zip",
+      "sha256": "f53996015d4f985103bed8d66a5e4eee2a08dd9820133ceb51ff684d0efd5442",
+      "size": 29192446,
       "executable": "bin/ds160",
-      "build_id": "4565d63ce5a19ab302b6ad5a"
+      "build_id": "73b0722bb2095911cd0e90b1"
     },
     "bun-darwin-arm64": {
-      "filename": "ds160-autofill-0.3.0-bun-darwin-arm64.zip",
-      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.0/ds160-autofill-0.3.0-bun-darwin-arm64.zip",
-      "sha256": "e1b07b2b01cb781044d27e01290a5aa2716c0e429bdacbafc9eb8712f95b1b22",
-      "size": 26263106,
+      "filename": "ds160-autofill-0.3.1-bun-darwin-arm64.zip",
+      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.1/ds160-autofill-0.3.1-bun-darwin-arm64.zip",
+      "sha256": "558a8bae865def32acb921ec8124f78b12a89c3ebdc1b83d71d3f0153f7cc573",
+      "size": 26263099,
       "executable": "bin/ds160",
-      "build_id": "ea959fa1a39038ae96986838"
+      "build_id": "03de98a1f385371138f38572"
     },
     "bun-windows-x64": {
-      "filename": "ds160-autofill-0.3.0-bun-windows-x64.zip",
-      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.0/ds160-autofill-0.3.0-bun-windows-x64.zip",
-      "sha256": "655b3e7a2237a7551e74699d86f8a336cb6664c576c2ad4858118491028b3519",
-      "size": 40638987,
+      "filename": "ds160-autofill-0.3.1-bun-windows-x64.zip",
+      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.1/ds160-autofill-0.3.1-bun-windows-x64.zip",
+      "sha256": "53a4a85d6853793be9772a434d87d84f0e94c81aa547e9b8b7c7d96d352377ac",
+      "size": 40639152,
       "executable": "bin/ds160.exe",
-      "build_id": "0ab06d407e3652f2ab11cd06"
+      "build_id": "feb0e0296d5d4c89d70965ef"
     }
-  }
+  },
+  "previous_version": "0.3.0"
 }
