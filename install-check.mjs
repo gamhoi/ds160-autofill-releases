@@ -43,7 +43,7 @@ Passive check:
 
 Exercise the official installer on a dedicated test installation:
   node install-check.mjs --output <report.json> --installer <install.mjs> \\
-    --version <preview-version> --dest <test-skill> --driver-dir <test-driver> \\
+    --version <prerelease-version> --dest <test-skill> --driver-dir <test-driver> \\
     --workspace <test-workspace> --browser-test
 
 Options:
@@ -52,7 +52,7 @@ Options:
   --driver-dir <directory>    Dedicated Playwright driver directory to inspect.
   --workspace <directory>     Private workspace to inspect.
   --installer <file>          Explicitly execute this inspected installer.
-  --version <version>         Exact public preview version for the installer.
+  --version <version>         Exact public prerelease version for maintainer-directed testing.
   --candidate-archive <zip>   Explicit trusted local candidate for the installer.
   --browser-test              Run installed doctor --browser-test after installation.
   --no-network                Skip public endpoint probes.
@@ -484,7 +484,7 @@ async function exerciseInstaller(options, paths) {
   return {
     requested: true,
     installer_sha256: installerHash,
-    invocation: options.candidateArchive ? 'candidate' : options.version ? 'exact-preview' : 'stable',
+    invocation: options.candidateArchive ? 'candidate' : options.version ? 'exact-version' : 'stable',
     execution: await runProcess(process.execPath, args, {
       timeoutMs: 40 * 60_000,
       paths,
