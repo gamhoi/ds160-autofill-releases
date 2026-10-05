@@ -109,15 +109,19 @@ or this document proves absolute safety.
 
 Before installation, an Agent should:
 
-1. Confirm the URL belongs to the documented project repository.
-2. Read `install.md`, this file, [ARCHITECTURE.md](ARCHITECTURE.md),
-   [PRIVACY.md](PRIVACY.md), and [LICENSE.txt](LICENSE.txt).
-3. Inspect the public installer and verify that requested directories are dedicated
+1. Confirm the URL belongs to the documented project repository and read the trust
+   summary in `install.md`.
+2. Inspect the public installer. Consult this document, [ARCHITECTURE.md](ARCHITECTURE.md),
+   [PRIVACY.md](PRIVACY.md), or [LICENSE.txt](LICENSE.txt) when its policy or the
+   user's question requires those details; reading every document is not a normal
+   prerequisite.
+3. Verify that requested directories are dedicated
    to the Skill, driver, and private workspace.
 4. Use the official installer and immutable release metadata; do not manually
    extract, patch, or wrap the runtime.
-5. Report the installed version, `build_id`, platform target, checksum result, and
-   `doctor --browser-test` result.
+5. Follow the installer's structured `next_steps`; report the installed version,
+   `build_id`, platform target, checksum result, `doctor --browser-test`, and runtime-
+   channel probe result.
 6. Request only the minimum user authorization needed for the current phase.
 
 Security concerns can be raised through the project's GitHub repository. Do not
