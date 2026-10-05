@@ -1,225 +1,107 @@
 # Install the DS-160 B1/B2 Skill
 
-This guide is an installation entrypoint for an Agent with local terminal, internet
-and GUI access. Installing the tool does not authorize filling or submitting an
-application. Personal B1/B2 use is permanently free; the binary engine is proprietary.
-There is no developer applicant-data backend. The installed LICENSE.txt contains the
-detailed terms and PRIVACY.md explains local files and CEAC data flow.
+This is the official installation entrypoint for an Agent with local terminal,
+internet, and desktop GUI access. Installing the Skill does not authorize filling,
+electronic signing, or submission. Personal B1/B2 use is permanently free.
 
-## Security and Trust Summary
+## What This Installs
 
-The public installer is source-readable and verifies the selected release's archive
-hash, exact package file allowlist, per-file checksums, release metadata, and binary
-identity. The runtime uses a private local workspace, a dedicated Chrome for Testing
-profile, and loopback-only broker/CDP connections. During filling, applicant data is
-sent to CEAC and its official `state.gov` photo service, not to a project-operated
-backend. Installation separately contacts GitHub and may contact npm and Playwright's
-browser distribution services.
+The installer places three separate components on the user's computer:
 
-The form engine is proprietary and the binaries are currently unsigned. Checksums
-establish integrity against the publisher's manifest; they are not code signing, an
-independent audit, or proof of absolute safety. An Agent whose policy forbids unsigned
-proprietary executables should stop and explain that policy rather than bypass it.
+- the managed `ds160-autofill` Skill and platform executable;
+- a pinned Playwright driver and Chrome for Testing;
+- a private workspace for browser state, diagnostics, and applicant files.
 
-Before installing, review:
+Applicant data is not sent to a project-operated backend. During filling it moves
+between local files, the local runner/browser, CEAC, and CEAC's official `state.gov`
+photo service. Installation separately contacts GitHub and may contact npm and the
+Playwright browser distribution service.
 
-- Architecture and data flow: https://gamhoi.github.io/ds160-autofill-releases/ARCHITECTURE.md
-- Security and remaining trust limitations: https://gamhoi.github.io/ds160-autofill-releases/SECURITY.md
-- Privacy and local retention: https://gamhoi.github.io/ds160-autofill-releases/PRIVACY.md
-- Personal-use license: https://gamhoi.github.io/ds160-autofill-releases/LICENSE.txt
+The public installer is source-readable. It verifies the official GitHub Release,
+archive SHA-256, exact package file list, per-file checksums, release metadata, and
+the installed binary's version/build identity before activation. See
+[ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), and
+[PRIVACY.md](PRIVACY.md) for the full trust and data-flow model.
 
-## Release Channels
+This free personal tool is distributed directly by its maintainer and does not yet
+carry paid Windows/macOS platform code-signing certificates. This affects publisher
+identity prompts, not the checksum and release-identity checks above. Never disable
+system-wide security protections. An Agent with a policy that categorically forbids
+unsigned executables must explain that policy and stop.
 
-Preview and Beta builds are opt-in prereleases and require an exact version. An RC is
-a feature-frozen candidate for stable. A stable/GA release is the default version
-selected by `stable.json`. Prereleases do not silently replace that default. Until a
-stable release exists, a public-testing prompt must include the exact Beta or RC
-version documented by the maintainer; the versionless command will correctly stop
-with `NO_STABLE_RELEASE`.
-
-## Copy to Your Agent
-
-Paste this prompt into the Agent that should use the Skill:
+## Give This to Your Agent
 
 ```text
-Install or update the DS-160 B1/B2 Skill by following this guide:
+Please install or update the DS-160 B1/B2 Skill using its official guide:
 https://gamhoi.github.io/ds160-autofill-releases/install.md
 
-Before executing an unsigned binary, read the guide's Security and Trust Summary and
-linked ARCHITECTURE.md, SECURITY.md, PRIVACY.md and LICENSE.txt. Use only the official
-installer. Do not manually extract the package, run npx skills add for this product,
-or create duplicate copies. After installation, run doctor with --browser-test and
-generate a temporary template. Report the installed version, build_id, platform target,
-Skill directory, driver directory, workspace and verification results.
+Use only the guide's public installer. After installation, follow the returned
+next_steps, read the installed SKILL.md, and report the version, build_id, platform,
+checksum verification, doctor --browser-test result, and runtime-channel probe result.
+Installation does not authorize filling, signing, or submission.
 ```
 
-Use one installation method and one managed `ds160-autofill` directory per target
-Agent. If another copy exists, identify which installation owns it before changing
-anything. Do not combine this installer with a Claude marketplace, `npx skills`, or
-manual-copy installation of the same Skill.
+## Requirements
 
-## Environment
+Supported platforms:
 
-Supported: macOS Intel x64 / Apple Silicon ARM64, Windows x64. Unsupported platforms
-must stop, not substitute a system Chrome or an unverified binary. Check the current
-release's platform availability before promising installation. A null release in
-stable.json means no approved public version is available yet.
+- macOS Intel x64;
+- macOS Apple Silicon ARM64;
+- Windows x64.
 
-Check `node --version` and `npm --version`. Node.js 20 or newer is needed for the
-installer and external Playwright, not to run the compiled executable itself.
-If missing, explain this dependency and install a supported Node.js LTS from
-https://nodejs.org/ using the user's approved OS/package-manager route. Obtain any
-required permission; do not disable security controls or repeatedly retry a blocked
-environment. Recheck both commands before proceeding.
+Node.js 20 or newer and npm are needed only for installation and the external
+Playwright driver. The compiled runtime does not require a separate Bun installation.
+Use PowerShell for documented commands on Windows. Keep the Skill, driver, and private
+workspace in separate local directories; do not place applicant data in the Skill
+directory or on a network/shared volume.
 
-## Install
+## Install or Update the Stable Version
 
-Choose the target Agent's supported Skill directory, with this Skill's own folder
-named ds160-autofill. Use absolute paths. Do not overwrite unrelated rules/config or
-assume all Agents share a directory. If the client has no compatible Skill loading
-mechanism, report it. Keep driver, workspace and applicant materials outside this folder.
-For a first installation, create the parent directory if needed but do not pre-create
-the final `--dest` directory; it must not exist until the managed installer activates it.
+1. Download and inspect the public installer:
 
-Download and inspect the public installer from:
-https://gamhoi.github.io/ds160-autofill-releases/install.mjs
+   https://gamhoi.github.io/ds160-autofill-releases/install.mjs
 
-Save it locally, then run in a persistent process session:
+2. Choose absolute paths. Create their common parent if necessary, but do not
+   pre-create the final Skill directory.
+
+3. Run the installer in a process session that can remain alive while Playwright and
+   Chromium are installed:
 
 ```text
 node <downloaded-install.mjs> --dest <absolute-skill-folder> --driver-dir <dedicated-driver-folder> --workspace <private-workspace>
 ```
 
-It downloads the stable platform ZIP, verifies archive/file checksums and binary
-identity, installs pinned Playwright/Chromium if necessary, and runs doctor before
-activation. No system Chrome, Bun installation, account or product login is needed.
-Unsigned OS approval may be necessary; never disable system-wide protections.
+The command installs or updates only the stable version selected by `stable.json`.
+It is atomic for the managed Skill: a failed activation preserves the previous
+version. Driver and workspace directories remain separate and are never replaced by
+Skill activation.
 
-## Test an Explicit Local Candidate
+## Required Verification
 
-For pre-release testing, obtain the matching platform ZIP directly from the maintainer
-and use the same public installer above. Do not unzip it manually or create a manifest:
+The successful `INSTALLED` or `ALREADY_INSTALLED` JSON contains `next_steps`. Follow
+them in order:
 
-```text
-node <downloaded-install.mjs> --candidate-archive <local-candidate.zip> --dest <absolute-test-skill-folder> --driver-dir <dedicated-driver-folder> --workspace <private-test-workspace>
-```
+1. Read the installed `SKILL.md`.
+2. Run the exact `RUN_BROWSER_TEST` command returned by the installer.
+3. Prove the Agent's runtime channel before reading applicant material:
+   - use `run` only when the host actually returns a reusable live-process handle and
+     provides a later writable-stdin operation;
+   - otherwise follow the installed `references/runtime.md` and complete
+     `session probe --browser-test` across separate tool calls, using `--anchor` only
+     when the host requires a native long-running background task.
+4. Generate a temporary intake reference and validate the completed profile before
+   accessing CEAC.
 
-This works even when stable.json has no release. Only an explicitly trusted local
-release ZIP is accepted; debug ZIPs and other-platform packages are rejected. The ZIP
-may be moved or renamed. Package checksums detect corruption, not authenticity of a
-self-contained candidate; verify any separately supplied SHA-256 with the maintainer.
-Do not combine this option with --version, --manifest-file, --rollback or --uninstall.
-Verify using the next section, then follow the installed SKILL.md for filling. Installation alone
-does not authorize a live application or submission. Normal installation and updates
-still use the approved stable release; testing does not publish or promote a candidate.
+The browser probes use synthetic local content and `about:blank`; they do not create,
+retrieve, sign, or submit a DS-160 application.
 
-## Test an Exact Public Preview
+## When Something Fails
 
-A maintainer may publish a GitHub prerelease to test the real public download path
-without changing the default stable version. Use only the exact version supplied by
-the maintainer:
+Do not repeatedly reinstall, clear browser caches, invent a bridge, or disable host
+security controls. Preserve the first error code and follow
+[INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md). The public
+`install-check.mjs` is a failure-diagnostic tool, not a normal installation step.
 
-```text
-node <downloaded-install.mjs> --version <preview-version> --dest <absolute-test-skill-folder> --driver-dir <dedicated-driver-folder> --workspace <private-test-workspace>
-```
-
-This downloads `manifest.json` and the matching platform ZIP from the official public
-GitHub Release, then performs the same checksum, identity, dependency and doctor
-checks as a stable install. Omitting `--version` still reads only stable.json. A public
-preview is not a stable release and must not be installed silently for ordinary users.
-
-## Verify
-
-The installer must report INSTALLED or ALREADY_INSTALLED. Read the installed
-SKILL.md, locate bin/ds160 (macOS) or bin/ds160.exe (Windows), then run:
-
-```text
-<exe> doctor --driver-dir <driver-folder> --workspace <workspace> --browser-test
-<exe> template --output <temporary-intake.json>
-```
-
-Confirm the local browser test passes and the target Agent can discover the Skill;
-reload its supported Skill mechanism if required. The generated intake is a reference,
-not a completed application. These checks must not create or submit a CEAC application.
-On macOS, a positively identified WorkBuddy host sandbox is handled automatically:
-the host sandbox remains enabled while the dedicated Chrome for Testing process uses
-`HOST_SANDBOX_COMPAT` and loopback CDP. Real runs use the dedicated workspace browser
-profile; the synthetic doctor test uses one non-applicant profile in the user's system
-temporary area so normal Chromium housekeeping does not conflict with workspace deletion
-guards. No user setting needs to be disabled. For an unrecognized sandbox,
-`SECURE_BROWSER_LAUNCH_REQUIRES_HOST_PERMISSION`
-still means the host blocked the secure no-activate launcher; rerun the same doctor
-command with that host's GUI-capable or unrestricted local-execution permission.
-
-## Installation Diagnostics
-
-Do not run diagnostics during a normal successful installation. If installation or
-browser verification fails and the error itself does not already identify a host GUI
-permission requirement, download and inspect the public checker:
-
-https://gamhoi.github.io/ds160-autofill-releases/install-check.mjs
-
-It is a source-readable Node.js script and does not contain the proprietary runtime.
-Run a passive check against the same directories first:
-
-```text
-node <install-check.mjs> --output <new-report.json> --dest <skill-folder> --driver-dir <driver-folder> --workspace <workspace>
-```
-
-For a dedicated compatibility test machine, it can execute the already-inspected
-official installer and collect installation plus browser verification in one report:
-
-```text
-node <install-check.mjs> --output <new-report.json> --installer <install.mjs> --version <exact-preview-version> --dest <dedicated-test-skill> --driver-dir <dedicated-test-driver> --workspace <dedicated-test-workspace> --browser-test
-```
-
-Create only their common parent directory. The `--dest` path itself must not exist;
-the installer creates it atomically. The driver and workspace paths may be absent or
-empty dedicated directories. The checker forwards value-free `INSTALL_STAGE` progress
-events while npm and Chromium dependencies are installed. This mode may install
-Playwright/Chromium and the selected Skill package, but it never creates, fills, signs
-or submits a DS-160 application. The report excludes applicant values, usernames,
-hostnames, absolute paths and raw logs. Review it before sharing. Do not upload a
-profile, photograph, browser profile or ordinary runtime log for installation support.
-
-## Update and Roll Back
-
-```text
-node <install.mjs> --dest <skill-folder> --check
-node <install.mjs> --dest <skill-folder>
-node <install.mjs> --dest <skill-folder> --version <retained-version>
-node <install.mjs> --dest <skill-folder> --rollback
-```
-
-Checking does not install. Update or rollback only with the user's approval and after
-the runner exits. A shared installation lock blocks concurrent runs/changes. A lock
-left by a killed process requires checking owner.json and proving its owner exited
-before manually removing it; never remove a live lock. Installation failure before
-activation leaves the previous package in place. Unknown files inside the Skill
-block updates rather than risk deleting applicant data. One previous package is retained.
-Driver repair may change a dedicated driver even when activation fails; it is separate
-from the Skill rollback. Applicant profiles, photos, diagnostics and PDFs are not replaced.
-
-Archived versions may no longer have downloadable ZIPs; choose a retained supported
-version instead. A checksum checks integrity, not publisher authenticity. Download
-only from the trusted publisher. Never send application material to installation support.
-
-## Uninstall
-
-Stop the runner and Chromium first, then use the same downloaded installer:
-
-```text
-node <install.mjs> --dest <skill-folder> --uninstall
-```
-
-The command removes only the checksum-verified managed Skill directory and its known
-rollback copy. It deliberately preserves the external driver directory, workspace,
-profiles, photos, diagnostics and saved PDFs, and reports their locations. If package
-files were changed or unknown files were placed inside the Skill, uninstall stops
-rather than deleting them. Move applicant material out and restore or reinstall the
-managed package before retrying. Remove preserved data separately only after the user
-identifies it and explicitly authorizes deletion.
-
-If filesystem locking prevents immediate cleanup after the managed directories have
-been detached, the result reports an `UNINSTALL_RESIDUAL_PRESERVED` warning and the
-exact residual path. Confirm no runner is active before removing only that path.
+Candidate/preview acceptance is documented separately in
+[RELEASE_TESTING.md](RELEASE_TESTING.md). Updates, rollback, and removal are in
+[MAINTENANCE.md](MAINTENANCE.md).
