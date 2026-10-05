@@ -457,6 +457,9 @@ var PUBLIC_FILES = Object.freeze([
   "release.json",
   "SHA256SUMS",
   "THIRD_PARTY_NOTICES.txt",
+  "INSTALLATION_TROUBLESHOOTING.md",
+  "RELEASE_TESTING.md",
+  "MAINTENANCE.md",
   "references/intake.md",
   "references/runtime.md",
   "references/setup.md",
@@ -965,9 +968,35 @@ async function install(manifest, options, {
     outside(destination, driver);
     outside(destination, workspace);
     const artifact = manifest.artifacts[target];
+    const nextSteps = () => {
+      const executable = path2.join(destination, artifact.executable);
+      return [
+        { action: "READ_INSTALLED_SKILL", path: path2.join(destination, "SKILL.md") },
+        {
+          action: "RUN_BROWSER_TEST",
+          program: executable,
+          args: ["doctor", "--driver-dir", driver, "--workspace", workspace, "--browser-test"]
+        },
+        {
+          action: "PROVE_RUNTIME_CHANNEL",
+          reference: path2.join(destination, "references", "runtime.md"),
+          preferred: "persistent_writable_stdin",
+          fallback: "session_probe_browser_test"
+        },
+        { action: "VALIDATE_PROFILE_BEFORE_CEAC" }
+      ];
+    };
     if (old?.archive_sha256 === artifact.sha256 && old.driver_dir === driver && old.workspace === workspace) {
       const warnings = await prepareDriver(path2.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute);
-      return { status: "ALREADY_INSTALLED", version: old.version, destination, driver_dir: driver, workspace, warnings };
+      return {
+        status: "ALREADY_INSTALLED",
+        version: old.version,
+        destination,
+        driver_dir: driver,
+        workspace,
+        warnings,
+        next_steps: nextSteps()
+      };
     }
     const files = inspectArchive(await fetchBytes(artifact.url, {
       allowLocal: options.allowLocal,
@@ -1026,7 +1055,16 @@ async function install(manifest, options, {
           warnings.push("PREVIOUS_COPY_PRESERVED: could not safely clean an older backup.");
         }
       }
-      return { status: "INSTALLED", version: manifest.version, destination, driver_dir: driver, workspace, previous_version: old?.version, warnings };
+      return {
+        status: "INSTALLED",
+        version: manifest.version,
+        destination,
+        driver_dir: driver,
+        workspace,
+        previous_version: old?.version,
+        warnings,
+        next_steps: nextSteps()
+      };
     } catch (error) {
       primaryError = error;
       if (movedOld && !activated)
