@@ -111,8 +111,8 @@ Before installation, an Agent should:
 
 1. Confirm the URL belongs to the documented project repository and read the trust
    summary in `install.md`.
-2. Inspect the public installer. Consult this document, [ARCHITECTURE.md](ARCHITECTURE.md),
-   [PRIVACY.md](PRIVACY.md), or [LICENSE.txt](LICENSE.txt) when its policy or the
+2. Inspect the public installer. Consult this document, [ARCHITECTURE.md](architecture.md),
+   [PRIVACY.md](privacy.md), or [LICENSE.txt](../LICENSE.txt) when its policy or the
    user's question requires those details; reading every document is not a normal
    prerequisite.
 3. Verify that requested directories are dedicated

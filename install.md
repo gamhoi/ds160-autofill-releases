@@ -1,8 +1,9 @@
-# Install the DS-160 B1/B2 Skill
+# DS-160 B1/B2 Skill: Agent Installation Protocol
 
-This is the official installation entrypoint for an Agent with local terminal,
-internet, and desktop GUI access. Installing the Skill does not authorize filling,
-electronic signing, or submission. Personal B1/B2 use is permanently free.
+This document is intended for an Agent after the user has directed it here. It is the
+official installation entrypoint for a host with local terminal, internet, and desktop
+GUI access. Installing the Skill does not authorize filling, electronic signing, or
+submission. Personal B1/B2 use is permanently free.
 
 ## What This Installs
 
@@ -20,26 +21,16 @@ Playwright browser distribution service.
 The public installer is source-readable. It verifies the official GitHub Release,
 archive SHA-256, exact package file list, per-file checksums, release metadata, and
 the installed binary's version/build identity before activation. See
-[ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), and
-[PRIVACY.md](PRIVACY.md) for the full trust and data-flow model.
+[Architecture](https://gamhoi.github.io/ds160-autofill-releases/docs/architecture.md),
+[Security](https://gamhoi.github.io/ds160-autofill-releases/docs/security.md), and
+[Privacy](https://gamhoi.github.io/ds160-autofill-releases/docs/privacy.md) for the
+full trust and data-flow model.
 
 This free personal tool is distributed directly by its maintainer and does not yet
 carry paid Windows/macOS platform code-signing certificates. This affects publisher
 identity prompts, not the checksum and release-identity checks above. Never disable
 system-wide security protections. An Agent with a policy that categorically forbids
 unsigned executables must explain that policy and stop.
-
-## Give This to Your Agent
-
-```text
-Please install or update the DS-160 B1/B2 Skill using its official guide:
-https://gamhoi.github.io/ds160-autofill-releases/install.md
-
-Use only the guide's public installer. After installation, follow the returned
-next_steps, read the installed SKILL.md, and report the version, build_id, platform,
-checksum verification, doctor --browser-test result, and runtime-channel probe result.
-Installation does not authorize filling, signing, or submission.
-```
 
 ## Requirements
 
@@ -99,9 +90,11 @@ retrieve, sign, or submit a DS-160 application.
 
 Do not repeatedly reinstall, clear browser caches, invent a bridge, or disable host
 security controls. Preserve the first error code and follow
-[INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md). The public
+[Installation Troubleshooting](https://gamhoi.github.io/ds160-autofill-releases/docs/troubleshooting.md).
+The public
 `install-check.mjs` is a failure-diagnostic tool, not a normal installation step.
 
 Candidate/preview acceptance is documented separately in
-[RELEASE_TESTING.md](RELEASE_TESTING.md). Updates, rollback, and removal are in
-[MAINTENANCE.md](MAINTENANCE.md).
+[Release Testing](https://gamhoi.github.io/ds160-autofill-releases/docs/release-testing.md).
+Updates, rollback, and removal are in
+[Maintenance](https://gamhoi.github.io/ds160-autofill-releases/docs/maintenance.md).

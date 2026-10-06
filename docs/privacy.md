@@ -5,8 +5,8 @@ analytics, telemetry, or applicant-data backend. It does not upload applicant
 materials or application answers to the developer.
 
 For the component-level data path and local session-broker boundary, see
-[ARCHITECTURE.md](ARCHITECTURE.md). For security limitations and pre-install review,
-see [SECURITY.md](SECURITY.md).
+[ARCHITECTURE.md](architecture.md). For security limitations and pre-install review,
+see [SECURITY.md](security.md).
 
 ## Where data goes
 

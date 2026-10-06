@@ -93,7 +93,7 @@ unrecognized environment.
 
 This compatibility mode reduces browser defense in depth. The outer host sandbox,
 dedicated profile, navigation restriction, visible browser, and human checkpoints
-remain part of the boundary. See [SECURITY.md](SECURITY.md) for the complete trust
+remain part of the boundary. See [SECURITY.md](security.md) for the complete trust
 model and limitations.
 
 ## Human authorization boundaries
