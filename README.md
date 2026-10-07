@@ -1,5 +1,7 @@
 # DS-160 B1/B2 Autofill Skill
 
+**English** | [简体中文](README.zh-CN.md)
+
 A local Agent Skill for assisted DS-160 B1/B2 preparation and form filling.
 Personal B1/B2 use is permanently free.
 
