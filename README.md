@@ -13,19 +13,30 @@ Department of State.
 
 ## Quick Start
 
-Give this prompt to an Agent with local terminal and desktop-browser access:
+1. Send this prompt to an Agent with local terminal and desktop-browser access:
 
 ```text
 Please install or update the DS-160 B1/B2 Skill using its official guide:
 https://gamhoi.github.io/ds160-autofill-releases/install.md
+If this URL is unavailable, use the identical Gitee mirror:
+https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.md
 
 Use only the guide's public installer. Installation does not authorize filling,
 electronic signing, or submission; ask me separately before each of those actions.
 ```
 
+2. After the Agent reports that installation, the browser test, and the runtime
+   channel are ready, provide the applicant documents and answer missing factual
+   questions.
+3. Read CAPTCHAs yourself, review every section against the source material, and
+   authorize electronic signing or submission separately only when ready.
+
 The Agent installation protocol is at [install.md](install.md). The installer selects
 the current stable version from `stable.json`, verifies the release archive and binary
 identity, installs the pinned browser driver, and returns exact verification steps.
+The same installer and ZIP files are available from the
+[Gitee mirror](https://gitee.com/gamhoi/ds160-autofill-releases); the installer can
+select the faster responding official manifest source or use `--source github|gitee` explicitly.
 
 ## See It Work
 
@@ -49,22 +60,10 @@ flowchart LR
 
 There is no project-operated applicant-data backend. Applicant files remain in the
 user's local workspace; values and photos are transmitted only when filling the
-official CEAC and `state.gov` photo-service pages. Installation separately contacts
-GitHub and may contact npm and the Playwright browser distribution service.
+official CEAC and `state.gov` photo-service pages. Installation contacts the selected
+GitHub or Gitee mirror and may contact npm and the Playwright browser distribution service.
 
 [Read the architecture and data-flow details](docs/architecture.md).
-
-## Expected Workflow
-
-1. Install and verify the Skill, driver, and dedicated browser.
-2. Provide applicant documents and answer unresolved factual questions.
-3. Generate and validate a local profile before opening CEAC.
-4. Let the runner fill the form while the Agent reports progress and checkpoints.
-5. Review every section against the source material and apply corrections locally.
-6. Sign or submit only after a new, explicit authorization from the applicant.
-
-CAPTCHAs are read by the applicant. The tool does not silently sign or submit an
-application.
 
 ## Supported Systems
 
@@ -107,7 +106,8 @@ Read the [security model](docs/security.md), [privacy statement](docs/privacy.md
 | Maintainer-directed candidates | [Release testing](docs/release-testing.md) |
 
 Platform packages and immutable manifests are published under
-[GitHub Releases](https://github.com/gamhoi/ds160-autofill-releases/releases). For
+[GitHub Releases](https://github.com/gamhoi/ds160-autofill-releases/releases) and
+[Gitee Releases](https://gitee.com/gamhoi/ds160-autofill-releases/releases). For
 questions, compatibility reports, or feature requests, open an issue in this
 repository. Do not attach applicant profiles, photos, CAPTCHA images, logs containing
 answers, or downloaded application documents.

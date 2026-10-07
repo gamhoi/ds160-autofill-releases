@@ -1,5 +1,5 @@
 DS-160 AUTOFILL FREE PERSONAL USE LICENSE
-Version 1.0
+Version 1.1
 
 Copyright (c) 2026 DS-160 Autofill project. All rights reserved.
 
@@ -8,6 +8,10 @@ Copyright (c) 2026 DS-160 Autofill project. All rights reserved.
 You may install, copy, and use the unmodified DS-160 Autofill B1/B2 binary Skill
 on any number of devices or Agent installations under your control, without a fee,
 to assist with your own visa application or an application for a family member.
+For this license, family member means your spouse or domestic partner, parent, child,
+sibling, grandparent, grandchild, legal guardian, or legal dependent. This permission
+applies only when no fee or other compensation is received and the use is not
+undertaken on behalf of a business, organization, employer, or professional service.
 This permission is permanent for versions distributed under this license.
 
 2. Commercial use is not licensed

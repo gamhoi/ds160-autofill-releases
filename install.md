@@ -15,16 +15,18 @@ The installer places three separate components on the user's computer:
 
 Applicant data is not sent to a project-operated backend. During filling it moves
 between local files, the local runner/browser, CEAC, and CEAC's official `state.gov`
-photo service. Installation separately contacts GitHub and may contact npm and the
-Playwright browser distribution service.
+photo service. Installation contacts the selected GitHub or Gitee release mirror and
+may contact npm and the Playwright browser distribution service.
 
-The public installer is source-readable. It verifies the official GitHub Release,
+The public installer is source-readable. It verifies the selected official Release,
 archive SHA-256, exact package file list, per-file checksums, release metadata, and
 the installed binary's version/build identity before activation. See
 [Architecture](https://gamhoi.github.io/ds160-autofill-releases/docs/architecture.md),
 [Security](https://gamhoi.github.io/ds160-autofill-releases/docs/security.md), and
 [Privacy](https://gamhoi.github.io/ds160-autofill-releases/docs/privacy.md) for the
 full trust and data-flow model.
+The same documents are under `docs/` in the
+[Gitee mirror](https://gitee.com/gamhoi/ds160-autofill-releases).
 
 This free personal tool is distributed directly by its maintainer and does not yet
 carry paid Windows/macOS platform code-signing certificates. This affects publisher
@@ -49,9 +51,10 @@ directory or on a network/shared volume.
 
 ## Install or Update the Stable Version
 
-1. Download and inspect the public installer:
+1. Download and inspect the same public installer from either mirror:
 
-   https://gamhoi.github.io/ds160-autofill-releases/install.mjs
+   - GitHub: https://gamhoi.github.io/ds160-autofill-releases/install.mjs
+   - Gitee: https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.mjs
 
 2. Choose absolute paths. Create their common parent if necessary, but do not
    pre-create the final Skill directory.
@@ -64,6 +67,10 @@ node <downloaded-install.mjs> --dest <absolute-skill-folder> --driver-dir <dedic
 ```
 
 The command installs or updates only the stable version selected by `stable.json`.
+By default, it checks both official manifests and selects the faster responding source.
+Use `--source github` or `--source gitee` only when a specific mirror is required.
+Both mirrors publish the same manifest bytes and platform ZIPs; a mismatch stops
+installation instead of accepting divergent release metadata.
 It is atomic for the managed Skill: a failed activation preserves the previous
 version. Driver and workspace directories remain separate and are never replaced by
 Skill activation.
@@ -91,7 +98,8 @@ retrieve, sign, or submit a DS-160 application.
 
 Do not repeatedly reinstall, clear browser caches, invent a bridge, or disable host
 security controls. Preserve the first error code and follow
-[Installation Troubleshooting](https://gamhoi.github.io/ds160-autofill-releases/docs/troubleshooting.md).
+[Installation Troubleshooting](https://gamhoi.github.io/ds160-autofill-releases/docs/troubleshooting.md)
+or the corresponding document in the Gitee mirror.
 The public
 `install-check.mjs` is a failure-diagnostic tool, not a normal installation step.
 

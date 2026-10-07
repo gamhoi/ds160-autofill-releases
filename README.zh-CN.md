@@ -11,18 +11,27 @@ Skill 会把申请材料整理成经过校验的本地 profile，通过独立且
 
 ## 快速开始
 
-把下面这段话发送给拥有本地终端和桌面浏览器权限的 Agent：
+1. 把下面这段话发送给拥有本地终端和桌面浏览器权限的 Agent：
 
 ```text
 请按照 DS-160 B1/B2 Skill 的官方指南安装或更新：
+https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.md
+如果该地址无法访问，可使用内容相同的 GitHub 入口：
 https://gamhoi.github.io/ds160-autofill-releases/install.md
 
 只使用指南提供的公开安装器。安装不代表我授权填写、电子签名或提交；
 执行这些操作前，请分别向我确认并取得授权。
 ```
 
+2. Agent 报告安装、浏览器测试和运行通道准备完成后，提供申请材料，并回答材料中缺失的
+   事实问题。
+3. 自行识别验证码，对照原始材料逐段检查 Review；只有准备妥当后，才分别授权电子签名
+   或提交。
+
 Agent 安装协议位于 [install.md](install.md)。安装器会读取 `stable.json` 选择当前稳定
 版本，校验发布压缩包和二进制身份，安装固定版本的浏览器驱动，并返回准确的验证步骤。
+同一份安装器与 ZIP 也发布在 [Gitee 镜像](https://gitee.com/gamhoi/ds160-autofill-releases)；
+默认选择清单响应较快的官方源，也可以用 `--source github|gitee` 指定。
 
 ## 使用演示
 
@@ -45,20 +54,10 @@ flowchart LR
 
 项目不运行用于接收申请人资料的后台服务。申请文件保留在用户本地工作区；只有在填写
 美国国务院官方 CEAC 和 `state.gov` 照片服务页面时，相关字段值和照片才会发送给官方
-网站。安装过程中会另外访问 GitHub，也可能访问 npm 和 Playwright 浏览器分发服务。
+网站。安装过程中会访问所选 GitHub 或 Gitee 镜像，也可能访问 npm 和 Playwright
+浏览器分发服务。
 
 [查看架构和数据流说明](docs/architecture.md)。
-
-## 标准流程
-
-1. 安装并验证 Skill、浏览器驱动和独立浏览器。
-2. 提供申请材料，并回答材料中无法确定的事实问题。
-3. 在打开 CEAC 前生成并校验本地 profile。
-4. Runner 自动填写表格，Agent 持续报告进度和人工检查点。
-5. 对照原始材料逐段检查 Review，并在本地完成必要更正。
-6. 只有申请人再次明确授权后，才可以电子签名或提交。
-
-验证码由申请人识别。工具不会静默签名或提交申请。
 
 ## 支持的平台
 
@@ -97,6 +96,7 @@ Playwright 和 Chrome for Testing 会独立安装，并固定到受支持的版�
 | 维护者指定的候选版本 | [Release testing](docs/release-testing.md) |
 
 各平台安装包和不可变 manifest 发布在
-[GitHub Releases](https://github.com/gamhoi/ds160-autofill-releases/releases)。如有问题、
+[GitHub Releases](https://github.com/gamhoi/ds160-autofill-releases/releases) 和
+[Gitee Releases](https://gitee.com/gamhoi/ds160-autofill-releases/releases)。如有问题、
 兼容性报告或功能建议，请在本仓库提交 Issue。不要在 Issue 中附加申请人 profile、照片、
 验证码图片、包含答案的日志或下载的申请文件。

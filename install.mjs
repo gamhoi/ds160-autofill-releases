@@ -426,11 +426,22 @@ function unzipSync(data, opts) {
 // delivery/release-contract.mjs
 var DOWNLOAD_REPOSITORY = "gamhoi/ds160-autofill-releases";
 var STABLE_URL = "https://gamhoi.github.io/ds160-autofill-releases/stable.json";
+var SOURCES = Object.freeze({
+  github: Object.freeze({
+    stable: STABLE_URL,
+    release: `https://github.com/${DOWNLOAD_REPOSITORY}/releases/download`
+  }),
+  gitee: Object.freeze({
+    stable: `https://gitee.com/${DOWNLOAD_REPOSITORY}/raw/master/stable.json`,
+    release: `https://gitee.com/${DOWNLOAD_REPOSITORY}/releases/download`
+  })
+});
+var releaseUrl = (source, version, filename) => `${SOURCES[source].release}/v${version}/${filename}`;
 var PRODUCT = Object.freeze({
   product_id: "ds160-autofill",
   product_uuid: "beb732f7-88f4-480e-8b8c-bc162a03596e",
-  license_id: "free-personal-v1",
-  license_sha256: "e1302fb9ad34ce08c21cfe767123a5df0c3ae3ba5e989e40230828689116e461"
+  license_id: "free-personal-v1.1",
+  license_sha256: "f1b9cb3c772f9bffb1bd38c54d14305acc8362f429454e2bb807e59569dfced7"
 });
 var CONTRACT = Object.freeze({
   schema_version: 2,
@@ -440,6 +451,10 @@ var CONTRACT = Object.freeze({
   playwright: "1.62.1",
   minimum_node: 20,
   ...PRODUCT
+});
+var LEGACY_LICENSE_032 = Object.freeze({
+  license_id: "free-personal-v1",
+  license_sha256: "e1302fb9ad34ce08c21cfe767123a5df0c3ae3ba5e989e40230828689116e461"
 });
 var TARGETS = Object.freeze({
   "bun-darwin-x64": { platform: "darwin", arch: "x64", executable: "bin/ds160" },
@@ -474,8 +489,13 @@ function assertManifest(manifest, { allowLocal = false, requireStable = false } 
     if (manifest?.[key] !== CONTRACT[key])
       throw new Error(`MANIFEST_INCOMPATIBLE: ${key}`);
   }
-  for (const key of ["product_id", "product_uuid", "license_id", "license_sha256"]) {
+  for (const key of ["product_id", "product_uuid"]) {
     if (manifest?.[key] !== CONTRACT[key])
+      throw new Error(`MANIFEST_INCOMPATIBLE: ${key}`);
+  }
+  const license = manifest?.version === "0.3.2" ? LEGACY_LICENSE_032 : CONTRACT;
+  for (const key of ["license_id", "license_sha256"]) {
+    if (manifest?.[key] !== license[key])
       throw new Error(`MANIFEST_INCOMPATIBLE: ${key}`);
   }
   if (!validVersion(manifest.version) || !["stable", "candidate"].includes(manifest.channel))
@@ -491,9 +511,13 @@ function assertManifest(manifest, { allowLocal = false, requireStable = false } 
     if (artifact.filename !== filename || artifact.executable !== TARGETS[target].executable || !/^[a-f0-9]{64}$/.test(artifact.sha256 || "") || !/^[a-f0-9]{24}$/.test(artifact.build_id || "") || !Number.isSafeInteger(artifact.size) || artifact.size <= 0 || artifact.size > 128 * 1024 * 1024)
       throw new Error("MANIFEST_INVALID: artifact");
     const url = new URL(artifact.url);
-    const expected = `https://github.com/${DOWNLOAD_REPOSITORY}/releases/download/v${manifest.version}/${filename}`;
+    const expected = releaseUrl("github", manifest.version, filename);
     if (artifact.url !== expected && !(allowLocal && url.protocol === "file:"))
       throw new Error("MANIFEST_INVALID: untrusted artifact URL");
+    if (artifact.sources !== undefined) {
+      if (!artifact.sources || typeof artifact.sources !== "object" || Array.isArray(artifact.sources) || Object.keys(artifact.sources).sort().join(",") !== "gitee,github" || artifact.sources.github !== expected || artifact.sources.gitee !== releaseUrl("gitee", manifest.version, filename) || artifact.url !== expected)
+        throw new Error("MANIFEST_INVALID: artifact sources");
+    }
   }
   return manifest;
 }
@@ -684,6 +708,38 @@ async function download(url, {
       throw new Error(`DOWNLOAD_TIMEOUT: download did not complete within ${timeoutMs}ms`);
     }
     throw error;
+  }
+}
+async function resolvePublicManifest(version, source = "auto", fetchBytes = download) {
+  if (!["auto", ...Object.keys(SOURCES)].includes(source))
+    throw new Error("SOURCE_INVALID");
+  const names = source === "auto" ? Object.keys(SOURCES) : [source];
+  const results = await Promise.allSettled(names.map(async (name) => {
+    const start = performance.now();
+    const url = version ? releaseUrl(name, version, "manifest.json") : SOURCES[name].stable;
+    const bytes = await fetchBytes(url, { limit: 1024 * 1024, timeoutMs: 1e4 });
+    return { name, bytes, durationMs: performance.now() - start };
+  }));
+  const available = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
+  if (!available.length)
+    throw new Error(`MIRROR_MANIFEST_UNAVAILABLE: ${results.map((result, index) => `${names[index]}=${result.reason?.message || "unknown"}`).join("; ")}`);
+  if (available.length === 2 && !available[0].bytes.equals(available[1].bytes))
+    throw new Error("MIRROR_MANIFEST_MISMATCH: public manifests differ; wait for publication to complete.");
+  available.sort((left, right) => left.durationMs - right.durationMs);
+  return { manifest: JSON.parse(available[0].bytes), source: available[0].name, availableSources: available.map((item) => item.name) };
+}
+async function fetchArchive(artifact, source, allowFallback, options, fetchBytes = download, version) {
+  const mirrorUrl = (name) => artifact.sources?.[name] || (name === "github" ? artifact.url : version ? releaseUrl("gitee", version, artifact.filename) : null);
+  const primary = mirrorUrl(source);
+  if (!primary)
+    throw new Error(`MIRROR_SOURCE_UNAVAILABLE: ${source}`);
+  try {
+    return await fetchBytes(primary, options);
+  } catch (error) {
+    const alternate = source === "github" ? "gitee" : "github";
+    if (!allowFallback || !mirrorUrl(alternate) || !(/^(DOWNLOAD_FAILED|DOWNLOAD_TIMEOUT)/.test(error.message) || error instanceof TypeError))
+      throw error;
+    return fetchBytes(mirrorUrl(alternate), options);
   }
 }
 function inspectArchive(bytes, artifact, manifest) {
@@ -1170,6 +1226,7 @@ async function main(argv = process.argv.slice(2)) {
     "driver-dir": { type: "string" },
     workspace: { type: "string" },
     version: { type: "string" },
+    source: { type: "string" },
     "manifest-file": { type: "string" },
     "candidate-archive": { type: "string" },
     "skip-dependencies": { type: "boolean" },
@@ -1187,11 +1244,11 @@ async function main(argv = process.argv.slice(2)) {
       seen.add(token.name);
     }
   if (values.help) {
-    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> [--driver-dir <dir>] [--workspace <dir>] [--version <exact-public-version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback | --uninstall]
-An explicit --version may install a public preview release. Without it, only stable.json is used. --candidate-archive installs an explicitly trusted local candidate. --skip-dependencies requires a working existing driver. --uninstall removes only the managed Skill and retained rollback copy; it preserves driver and workspace data.`);
+    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> [--source auto|github|gitee] [--driver-dir <dir>] [--workspace <dir>] [--version <exact-public-version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback | --uninstall]
+Without --source, the installer compares the two official mirrors and uses the faster available one. Explicit --source selects only that mirror. --candidate-archive installs an explicitly trusted local candidate. --skip-dependencies requires a working existing driver. --uninstall preserves driver and workspace data.`);
     return;
   }
-  for (const key of ["version", "manifest-file", "candidate-archive"]) {
+  for (const key of ["version", "source", "manifest-file", "candidate-archive"]) {
     if (seen.has(key) && !values[key])
       throw new Error(`INVALID_ARGUMENT: empty --${key}`);
   }
@@ -1199,14 +1256,14 @@ An explicit --version may install a public preview release. Without it, only sta
     throw new Error("DESTINATION_REQUIRED: provide the absolute target Agent Skill directory.");
   if ([values.check, values.rollback, values.uninstall].filter(Boolean).length > 1)
     throw new Error("INVALID_ARGUMENT: choose one of check, rollback or uninstall");
-  if (values.rollback && (values.version || values["manifest-file"] || values["candidate-archive"]))
+  if (values.rollback && (values.version || values.source || values["manifest-file"] || values["candidate-archive"]))
     throw new Error("INVALID_ARGUMENT: incompatible rollback options");
   if (values.rollback) {
     console.log(JSON.stringify(await rollback(values.dest)));
     return;
   }
   if (values.uninstall) {
-    if (values.version || values["manifest-file"] || values["candidate-archive"] || values["driver-dir"] || values.workspace || values["skip-dependencies"] || values["allow-downgrade"])
+    if (values.version || values.source || values["manifest-file"] || values["candidate-archive"] || values["driver-dir"] || values.workspace || values["skip-dependencies"] || values["allow-downgrade"])
       throw new Error("INVALID_ARGUMENT: uninstall accepts only --dest");
     console.log(JSON.stringify(await uninstall(values.dest)));
     return;
@@ -1215,9 +1272,14 @@ An explicit --version may install a public preview release. Without it, only sta
     throw new Error("VERSION_INVALID");
   if ([values.version, values["manifest-file"], values["candidate-archive"]].filter(Boolean).length > 1)
     throw new Error("INVALID_ARGUMENT: choose one of version, manifest-file or candidate-archive");
+  if (values.source && !["auto", ...Object.keys(SOURCES)].includes(values.source))
+    throw new Error("SOURCE_INVALID");
+  if (values.source && (values["manifest-file"] || values["candidate-archive"]))
+    throw new Error("INVALID_ARGUMENT: --source is for public releases only");
   const candidate = values["candidate-archive"] ? await candidateFromArchive(values["candidate-archive"]) : null;
   const allowLocal = Boolean(values["manifest-file"] || candidate);
-  const manifest = candidate?.manifest || (values["manifest-file"] ? JSON.parse(await download(pathToFileURL(path2.resolve(values["manifest-file"])).href, { allowLocal: true, limit: 1024 * 1024 })) : JSON.parse(await download(values.version ? `https://github.com/${DOWNLOAD_REPOSITORY}/releases/download/v${values.version}/manifest.json` : STABLE_URL, { limit: 1024 * 1024 })));
+  const remote = allowLocal ? null : await resolvePublicManifest(values.version, values.source || "auto");
+  const manifest = candidate?.manifest || (values["manifest-file"] ? JSON.parse(await download(pathToFileURL(path2.resolve(values["manifest-file"])).href, { allowLocal: true, limit: 1024 * 1024 })) : remote.manifest);
   if (values.version && manifest.version !== values.version)
     throw new Error("MANIFEST_VERSION_MISMATCH");
   assertManifest(manifest, { allowLocal, requireStable: !allowLocal && !values.version });
@@ -1244,7 +1306,7 @@ An explicit --version may install a public preview release. Without it, only sta
     allowDowngrade: values["allow-downgrade"],
     allowLocal,
     allowPrerelease: Boolean(values.version)
-  }, candidate ? { fetchBytes: async () => candidate.bytes } : undefined)));
+  }, candidate ? { fetchBytes: async () => candidate.bytes } : remote ? { fetchBytes: (_url, options) => fetchArchive(manifest.artifacts[target], remote.source, !values.source || values.source === "auto", options, download, manifest.version) } : undefined)));
 }
 
 // delivery/installer-entry.mjs
