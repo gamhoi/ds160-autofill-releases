@@ -30,7 +30,8 @@ This free personal tool is distributed directly by its maintainer and does not y
 carry paid Windows/macOS platform code-signing certificates. This affects publisher
 identity prompts, not the checksum and release-identity checks above. Never disable
 system-wide security protections. An Agent with a policy that categorically forbids
-unsigned executables must explain that policy and stop.
+proprietary executables without a platform publisher identity must explain that policy
+and stop.
 
 ## Requirements
 

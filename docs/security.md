@@ -60,6 +60,10 @@ Applicant files are not encrypted by the product. Anyone with access to the
 workspace may be able to read them. Use a private local directory, avoid shared or
 network-mounted folders, and review files before sharing or deleting them.
 
+The dedicated browser profile disables Chrome's address, payment-card, credential,
+and password-saving features. This prevents browser save prompts during form filling
+without changing the user's normal browser profile.
+
 Diagnostics remain local unless the user shares them. The bounded `diagnostics`
 export is designed to omit applicant values, but it must still be reviewed before
 sharing. Never attach profiles, photographs, browser profiles, raw runtime logs, or
@@ -91,8 +95,11 @@ Agent's system-wide sandbox.
 
 ## Remaining trust limitations
 
-- The form engine is a proprietary, currently unsigned binary. Its complete source
-  cannot be independently reviewed from the public release repository.
+- The form engine is proprietary. macOS builds carry identity-free ad-hoc signatures
+  so the operating system can detect post-build modification, but they are not signed
+  with a maintainer Developer ID and are not notarized. The Windows executable has no
+  Authenticode publisher signature. Complete engine source cannot be independently
+  reviewed from the public release repository.
 - The public installer, manifests, checksums, documentation, package inventory, and
   release identities improve transparency and integrity, but they are not equivalent
   to platform code signing, notarization, reproducible builds, or an independent
@@ -101,9 +108,9 @@ Agent's system-wide sandbox.
   endpoint security software, or the Agent host changes behavior.
 - The project is not affiliated with or endorsed by the U.S. Department of State.
 
-An Agent whose policy forbids unsigned proprietary executables should stop and
-explain that policy rather than bypass it. Users should not be told that a checksum
-or this document proves absolute safety.
+An Agent whose policy forbids proprietary executables without a platform publisher
+identity should stop and explain that policy rather than bypass it. Users should not
+be told that a checksum, ad-hoc signature, or this document proves absolute safety.
 
 ## Recommended Agent review
 

@@ -1,12 +1,12 @@
 # Public Media Assets
 
-This directory reserves the public demonstration media slot.
+This directory contains public demonstration media.
 
-Planned files:
+Current files:
 
 - `demo.webp`: short animated walkthrough embedded in the repository README;
-- `demo-poster.webp`: static accessible preview frame.
 
-The demo must use synthetic applicant data, mask all application identifiers and
-document barcodes, hide CAPTCHA values, and show separate human Review and submission
-authorization checkpoints. No real applicant material belongs in this directory.
+The demo must use synthetic applicant data and show separate human Review and
+submission-authorization checkpoints. Synthetic field values may remain readable,
+but real applicant material, live application or recovery identifiers, document
+barcodes, session tokens, usernames, and local filesystem paths must not appear.

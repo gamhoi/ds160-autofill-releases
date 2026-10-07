@@ -26,15 +26,11 @@ Agent 安装协议位于 [install.md](install.md)。安装器会读取 `stable.j
 
 ## 使用演示
 
-> **演示动图预留位置。** 后续将提供经过隐私处理的完整演示，包括 Agent 安装、
-> 本地材料整理、profile 生成、可见浏览器自动化、人工输入验证码、快速填写、Review、
-> 独立的提交授权以及下载确认文件。
+![DS-160 辅助填写演示](assets/demo.webp)
 
-<!--
-经审核的演示资源完成后，将上方提示替换为 Markdown 图片，替代文字使用
-“DS-160 assisted filling demonstration”，资源路径使用 assets/demo.webp。
-演示只能使用合成资料，并遵守内部的分镜和脱敏规范。
--->
+演示中的申请人资料全部为虚构数据。动图展示 Agent 安装、本地 profile 准备、可见的
+独立浏览器、人工输入验证码、快速填写、更正重放、Review、独立的提交授权以及下载
+确认文件。
 
 ## 工作原理
 
@@ -80,8 +76,9 @@ Playwright 和 Chrome for Testing 会独立安装，并固定到受支持的版�
 - 安装器公开且可以直接阅读源码。
 - 发布压缩包使用固定文件白名单、SHA-256 校验和以及嵌入式版本和 build 身份校验。
 - Runtime 不使用开发者账号、分析接口、遥测收集器、授权服务器或申请人资料后台。
-- 当前 Windows 和 macOS 可执行文件没有购买平台代码签名证书。这会影响发布者身份提示，
-  但不影响校验和与发布身份验证。
+- macOS 可执行文件使用不包含发布者身份的 ad-hoc 签名，没有维护者 Developer ID 或
+  Apple 公证；Windows 可执行文件没有 Authenticode 发布者签名。校验和能够验证完整性，
+  但不能证明发布者身份。
 - 申请人始终需要自行负责所有回答的准确性，以及是否最终签名和提交。
 
 安装前请阅读[安全模型](docs/security.md)、[隐私说明](docs/privacy.md)和
@@ -93,7 +90,7 @@ Playwright 和 Chrome for Testing 会独立安装，并固定到受支持的版�
 | --- | --- |
 | 安装或更新 | [Agent 安装协议](install.md) |
 | 架构和本地数据流 | [Architecture](docs/architecture.md) |
-| 信任边界和未签名二进制 | [Security](docs/security.md) |
+| 信任边界和发布者身份 | [Security](docs/security.md) |
 | 申请人资料处理 | [Privacy](docs/privacy.md) |
 | 安装故障 | [Troubleshooting](docs/troubleshooting.md) |
 | 更新、回滚与卸载 | [Maintenance](docs/maintenance.md) |

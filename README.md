@@ -29,17 +29,12 @@ identity, installs the pinned browser driver, and returns exact verification ste
 
 ## See It Work
 
-> **Demo animation reserved.** A privacy-safe walkthrough is being prepared showing
-> Agent installation, local document intake, profile preparation, visible browser
-> automation, human CAPTCHA entry, rapid form filling, Review, explicit submission
-> authorization, and the downloaded confirmation document.
+![DS-160 assisted filling demonstration](assets/demo.webp)
 
-<!--
-When the approved asset is ready, replace the callout above with a Markdown image
-whose alt text is "DS-160 assisted filling demonstration" and whose source is
-assets/demo.webp. Keep the asset synthetic and follow the private maintainer
-storyboard/redaction spec.
--->
+The demonstration uses fictional applicant material. It shows Agent installation,
+local profile preparation, a visible dedicated browser, human CAPTCHA entry, rapid
+form filling, correction replay, Review, explicit submission authorization, and the
+downloaded confirmation document.
 
 ## How It Works
 
@@ -90,8 +85,9 @@ pinned to the supported version.
   version/build identity checks.
 - The runtime does not use a developer account, analytics endpoint, telemetry
   collector, licensing server, or applicant-data backend.
-- The current Windows and macOS executables are distributed without paid platform
-  code-signing certificates. Checksums verify integrity, not publisher identity.
+- macOS executables use identity-free ad-hoc signatures; they have no maintainer
+  Developer ID or notarization. The Windows executable has no Authenticode publisher
+  signature. Checksums verify integrity, not publisher identity.
 - The applicant remains responsible for the accuracy of all answers and for the final
   decision to sign and submit.
 
@@ -104,7 +100,7 @@ Read the [security model](docs/security.md), [privacy statement](docs/privacy.md
 | --- | --- |
 | Install or update | [Agent installation protocol](install.md) |
 | Architecture and local data flow | [Architecture](docs/architecture.md) |
-| Trust boundaries and unsigned binaries | [Security](docs/security.md) |
+| Trust boundaries and publisher identity | [Security](docs/security.md) |
 | Applicant-data handling | [Privacy](docs/privacy.md) |
 | Installation failures | [Troubleshooting](docs/troubleshooting.md) |
 | Update, rollback, and uninstall | [Maintenance](docs/maintenance.md) |
