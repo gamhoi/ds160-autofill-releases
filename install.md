@@ -47,7 +47,10 @@ Node.js 20 or newer and npm are needed only for installation and the external
 Playwright driver. The compiled runtime does not require a separate Bun installation.
 Use PowerShell for documented commands on Windows. Keep the Skill, driver, and private
 workspace in separate local directories; do not place applicant data in the Skill
-directory or on a network/shared volume.
+directory or on a network/shared volume. Installation must be able to write the
+driver/workspace and atomically rename under the Skill parent. Later runtime calls
+must be able to manage the lock in the installed Skill and rename metadata in the
+workspace. A privileged install does not prove those later permissions.
 
 ## Install or Update the Stable Version
 
@@ -56,8 +59,13 @@ directory or on a network/shared volume.
    - GitHub: https://gamhoi.github.io/ds160-autofill-releases/install.mjs
    - Gitee: https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.mjs
 
-2. Choose absolute paths. Create their common parent if necessary, but do not
-   pre-create the final Skill directory.
+2. Choose absolute paths inside private local locations that the Agent may modify
+   in its normal execution mode. Create their common parent if necessary, but do
+   not pre-create the final Skill directory. On a host with path restrictions,
+   complete the disposable [path-policy check](docs/troubleshooting.md#path-policy-check)
+   before installation, in the same permission mode that later `session` calls
+   will use. Do not move applicant files into a repository or synced folder merely
+   to gain write permission.
 
 3. Run the installer in a process session that can remain alive while Playwright and
    Chromium are installed:
@@ -83,6 +91,9 @@ them in order:
 1. Read the installed `SKILL.md`.
 2. Run the exact `RUN_BROWSER_TEST` command returned by the installer.
 3. Prove the Agent's runtime channel before reading applicant material:
+   - if installation ran with different privileges, first repeat the path-policy
+     check inside the installed Skill directory and workspace in the session
+     command's actual permission mode;
    - use `run` only when the host actually returns a reusable live-process handle and
      provides a later writable-stdin operation;
    - otherwise follow the installed `references/runtime.md` and complete

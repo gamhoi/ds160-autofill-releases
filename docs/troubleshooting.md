@@ -1,7 +1,8 @@
 # Installation Troubleshooting
 
-Use this document only after the ordinary stable installation or required browser
-verification fails. Preserve the first failure and avoid speculative cleanup.
+Use the path-policy check below before installation on a restricted host. Use the
+other sections if ordinary stable installation or required browser verification
+fails. Preserve the first failure and avoid speculative cleanup.
 
 ## First Checks
 
@@ -12,6 +13,36 @@ verification fails. Preserve the first failure and avoid speculative cleanup.
    active before retrying or removing a stale lock.
 4. Do not upload applicant files, photographs, browser profiles, saved PDFs, or raw
    runtime logs.
+
+## Path-Policy Check
+
+The installer atomically activates the Skill by renaming a staged directory under
+the Skill parent. It also writes the driver and workspace. Session mode atomically
+renames broker metadata inside the workspace; the runtime keeps its managed
+operation lock beside the installed Skill. Merely creating a file, passing
+`doctor --browser-test`, or installing with elevated privileges does not prove
+that later session commands have these permissions.
+
+On a host that restricts file paths, test the chosen Skill parent, driver
+directory, and workspace before installation. After installation, also test the
+installed Skill directory and workspace in the mode used for session calls:
+
+1. Create the chosen driver and workspace directories if absent. Under each
+   tested location, create a uniquely named disposable empty directory. Do not
+   pre-create the final Skill directory; test its parent instead.
+2. Rename that directory to a new sibling name, then remove it. Require all three
+   operations to succeed. For the installed Skill and workspace, use the same
+   execution mode as `session probe`, `wait`, `reply`, and `start`. Check whether
+   the host silently escalated the command; an elevated pass does not count for
+   sandboxed runtime calls.
+3. If a location fails, choose another private local permitted location or obtain
+   a persistent, narrowly scoped host path grant. Do not disable the whole host
+   sandbox or use a repository, cloud-synced folder, or shared volume for applicant
+   data just because it is writable.
+
+The check creates only empty disposable directories. If removal is denied, report
+the residue and do not use that location for a new installation. Do not delete
+existing Skill, driver, browser, or applicant data while testing permissions.
 
 ## Browser Verification
 
@@ -59,5 +90,11 @@ be reviewed before sharing.
 - stale lock: prove the recorded owner exited, then remove only the documented lock.
 - `SECURE_BROWSER_LAUNCH_REQUIRES_HOST_PERMISSION`: follow the Agent host's documented
   GUI/local-execution permission flow without disabling system-wide protections.
-- session detached probe fails: use `--anchor` only if the host provides a genuine
-  long-running background task; otherwise that Agent cannot drive this Skill safely.
+- `SESSION_START_FAILED` or a broker that never becomes ready: record any surfaced
+  underlying error and check workspace rename/delete permissions in the same host mode.
+  A missing session log does not prove a process-lifetime failure. If paths work,
+  verify whether the host kills descendants at the end of a tool call.
+- detached probe fails because the host reaps child processes: use `--anchor` only
+  if it provides a genuine long-running background task. `--anchor` does not
+  change filesystem permissions. Conclude that the host cannot drive the Skill
+  only after the path and process-lifetime checks both fail to provide a safe route.

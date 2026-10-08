@@ -2,6 +2,8 @@
 
 Ordinary users should install the stable channel from `install.md`. The routes below
 are for maintainer-directed acceptance testing and never silently replace stable.
+Choose separate private local directories that pass the same path-policy check as
+stable installation, using the execution mode intended for later session calls.
 
 ## Trusted Local Candidate
 
