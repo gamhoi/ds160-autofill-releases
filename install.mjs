@@ -461,7 +461,7 @@ var TARGETS = Object.freeze({
   "bun-darwin-arm64": { platform: "darwin", arch: "arm64", executable: "bin/ds160" },
   "bun-windows-x64": { platform: "win32", arch: "x64", executable: "bin/ds160.exe" }
 });
-var PUBLIC_FILES = Object.freeze([
+var LEGACY_PUBLIC_FILES = Object.freeze([
   "SKILL.md",
   "README.md",
   "install.md",
@@ -480,6 +480,29 @@ var PUBLIC_FILES = Object.freeze([
   "references/setup.md",
   "references/photo.md"
 ]);
+var PUBLIC_FILES = Object.freeze([
+  "SKILL.md",
+  "README.md",
+  "install.md",
+  "ARCHITECTURE.md",
+  "SECURITY.md",
+  "LICENSE.txt",
+  "PRIVACY.md",
+  "release.json",
+  "SHA256SUMS",
+  "THIRD_PARTY_NOTICES.txt",
+  "INSTALLATION_TROUBLESHOOTING.md",
+  "RELEASE_TESTING.md",
+  "MAINTENANCE.md",
+  "references/intake.md",
+  "references/runtime.md",
+  "references/runtime-windows.md",
+  "references/setup.md",
+  "references/setup-macos.md",
+  "references/setup-windows.md",
+  "references/photo.md"
+]);
+var publicFilesForVersion = (version) => compareVersions(version, "0.3.7") < 0 ? LEGACY_PUBLIC_FILES : PUBLIC_FILES;
 var RETENTION = Object.freeze({ stable_count: 5, stable_days: 90, prerelease_days: 14, artifact_days: 7 });
 var validVersion = (value) => typeof value === "string" && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[a-zA-Z0-9]+(?:[.-][a-zA-Z0-9]+)*)?$/.test(value);
 function assertManifest(manifest, { allowLocal = false, requireStable = false } = {}) {
@@ -745,7 +768,7 @@ async function fetchArchive(artifact, source, allowFallback, options, fetchBytes
 function inspectArchive(bytes, artifact, manifest) {
   if (bytes.length !== artifact.size || sha256(bytes) !== artifact.sha256)
     throw new Error("ARCHIVE_CHECKSUM_FAILED");
-  const expected = new Set([...PUBLIC_FILES, artifact.executable]);
+  const expected = new Set([...publicFilesForVersion(manifest.version), artifact.executable]);
   const seen = new Set;
   let originalSize = 0;
   const zipped = unzipSync(bytes, { filter(info) {
@@ -874,7 +897,7 @@ async function installedState(destination) {
   }));
   if (state.tool !== "ds160-runtime" || state.schema_version !== 1 || !validVersion(state.version) || !Object.hasOwn(TARGETS, state.target))
     throw new Error("INSTALLATION_STATE_INVALID");
-  const expected = new Set([...PUBLIC_FILES, TARGETS[state.target].executable, STATE]);
+  const expected = new Set([...publicFilesForVersion(state.version), TARGETS[state.target].executable, STATE]);
   const actual = await listFiles(destination);
   if (actual.length !== expected.size || actual.some((file) => !expected.has(file)))
     throw new Error("INSTALLATION_MODIFIED: unknown files exist; preserve them outside the Skill before updating.");
