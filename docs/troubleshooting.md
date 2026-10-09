@@ -1,6 +1,6 @@
 # Installation Troubleshooting
 
-Use the path-policy check below before installation on a restricted host. Use the
+Use the path-policy check below before installing into newly chosen locations. Use the
 other sections if ordinary stable installation or required browser verification
 fails. Preserve the first failure and avoid speculative cleanup.
 
@@ -8,7 +8,9 @@ fails. Preserve the first failure and avoid speculative cleanup.
 
 1. Record the operating system, architecture, Agent name/version, requested Skill,
    driver and workspace locations, installer status, error code, version, and build ID.
-2. Confirm the three directories are local and separate.
+2. Confirm the three directories are local and separate; siblings under one
+   permitted private root are separate. Do not assume the home directory is
+   permitted or that the Agent's current task directory is a repository.
 3. Confirm no installer, runner, broker, or Skill-owned Chromium process is still
    active before retrying or removing a stale lock.
 4. Do not upload applicant files, photographs, browser profiles, saved PDFs, or raw
@@ -23,26 +25,33 @@ operation lock beside the installed Skill. Merely creating a file, passing
 `doctor --browser-test`, or installing with elevated privileges does not prove
 that later session commands have these permissions.
 
-On a host that restricts file paths, test the chosen Skill parent, driver
-directory, and workspace before installation. After installation, also test the
-installed Skill directory and workspace in the mode used for session calls:
+Test the chosen Skill parent, driver directory, and workspace before installation,
+even if the host's path restrictions are not yet known. If installation used a
+different permission mode, repeat the workspace check in the mode used for
+session calls:
 
 1. Create the chosen driver and workspace directories if absent. Under each
    tested location, create a uniquely named disposable empty directory. Do not
    pre-create the final Skill directory; test its parent instead.
-2. Rename that directory to a new sibling name, then remove it. Require all three
-   operations to succeed. For the installed Skill and workspace, use the same
-   execution mode as `session probe`, `wait`, `reply`, and `start`. Check whether
-   the host silently escalated the command; an elevated pass does not count for
-   sandboxed runtime calls.
-3. If a location fails, choose another private local permitted location or obtain
-   a persistent, narrowly scoped host path grant. Do not disable the whole host
-   sandbox or use a repository, cloud-synced folder, or shared volume for applicant
-   data just because it is writable.
+2. Rename that directory to a new sibling name. Require creation and rename to
+   succeed. Use the same execution mode as `session probe`, `wait`, `reply`, and
+   `start`. Check whether the host silently escalated the command; an elevated
+   pass does not count for sandboxed runtime calls.
+3. If creation or rename fails, choose another private local permitted location
+   or obtain a persistent, narrowly scoped host path grant. Do not disable the
+   whole host sandbox or use a repository, cloud-synced folder, or shared volume
+   for applicant data just because it is writable.
 
-The check creates only empty disposable directories. If removal is denied, report
-the residue and do not use that location for a new installation. Do not delete
+The check creates only empty disposable directories. Record their names for later
+cleanup; removal is not part of the pass/fail criterion. Some Agent hosts block
+shell deletion everywhere, even where the runtime can create and rename files.
+Do not infer that a path is unusable from `rmdir` or another shell deletion
+failure. Continue to installation and the required session probe, which exercise
+the actual lifecycle; report any cleanup failure or residue they produce. Do not
+seek a broad sandbox bypass just to remove probe directories, and do not delete
 existing Skill, driver, browser, or applicant data while testing permissions.
+Do not place a disposable probe inside the installed Skill: `session probe`
+checks its actual operation-lock lifecycle without leaving an unrelated test entry.
 
 ## Browser Verification
 
@@ -91,7 +100,8 @@ be reviewed before sharing.
 - `SECURE_BROWSER_LAUNCH_REQUIRES_HOST_PERMISSION`: follow the Agent host's documented
   GUI/local-execution permission flow without disabling system-wide protections.
 - `SESSION_START_FAILED` or a broker that never becomes ready: record any surfaced
-  underlying error and check workspace rename/delete permissions in the same host mode.
+  underlying error and check workspace creation/rename permissions in the same host mode.
+  A shell deletion denial alone does not explain a broker startup failure.
   A missing session log does not prove a process-lifetime failure. If paths work,
   verify whether the host kills descendants at the end of a tool call.
 - detached probe fails because the host reaps child processes: use `--anchor` only

@@ -2,8 +2,21 @@
 
 Ordinary users should install the stable channel from `install.md`. The routes below
 are for maintainer-directed acceptance testing and never silently replace stable.
-Choose separate private local directories that pass the same path-policy check as
-stable installation, using the execution mode intended for later session calls.
+Choose the test root before installing. If the user provided one, verify that it
+is private, local, and neither a repository nor a synced or shared volume. If not,
+first consider the Agent host's current authorized local task directory. Verify
+its actual properties and that it will remain available throughout this test;
+do not assume that a home-directory path is permitted or that a task directory
+is durable enough for later real applications. If neither location qualifies,
+ask the user for a suitable root instead of inventing one under the home directory.
+
+For example, use `<authorized-test-root>/ds160-test/{skill,driver,workspace}`:
+three sibling directories under one permitted root, not directories nested inside
+one another. Before running the installer, complete the path-policy check in
+`INSTALLATION_TROUBLESHOOTING.md` for the Skill parent, driver, and workspace
+in the execution mode intended for later session calls. Check for silent host
+escalation. If any check fails, stop before installation; a successful install
+in a different permission mode would not prove that session mode can run.
 
 ## Trusted Local Candidate
 
