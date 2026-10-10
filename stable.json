@@ -9,45 +9,45 @@
   "product_uuid": "beb732f7-88f4-480e-8b8c-bc162a03596e",
   "license_id": "free-personal-v1.1",
   "license_sha256": "f1b9cb3c772f9bffb1bd38c54d14305acc8362f429454e2bb807e59569dfced7",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "channel": "stable",
   "artifacts": {
     "bun-darwin-x64": {
-      "filename": "ds160-autofill-0.3.7-bun-darwin-x64.zip",
-      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-darwin-x64.zip",
+      "filename": "ds160-autofill-0.3.8-bun-darwin-x64.zip",
+      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-darwin-x64.zip",
       "sources": {
-        "github": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-darwin-x64.zip",
-        "gitee": "https://gitee.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-darwin-x64.zip"
+        "github": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-darwin-x64.zip",
+        "gitee": "https://gitee.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-darwin-x64.zip"
       },
-      "sha256": "dd22443f2a2359cd79ea9bbf7030d5b44218621f4fe909d864e39d98accf73a2",
-      "size": 29201085,
+      "sha256": "4d7a98fdb1a9e0e7d993b5b3563f3346e092ad0d0187f5d9ed6e8c98347d1154",
+      "size": 29201540,
       "executable": "bin/ds160",
-      "build_id": "8d0dd9497c6246c945e3f6f3"
+      "build_id": "6e35a341d9595f366e30d104"
     },
     "bun-darwin-arm64": {
-      "filename": "ds160-autofill-0.3.7-bun-darwin-arm64.zip",
-      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-darwin-arm64.zip",
+      "filename": "ds160-autofill-0.3.8-bun-darwin-arm64.zip",
+      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-darwin-arm64.zip",
       "sources": {
-        "github": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-darwin-arm64.zip",
-        "gitee": "https://gitee.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-darwin-arm64.zip"
+        "github": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-darwin-arm64.zip",
+        "gitee": "https://gitee.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-darwin-arm64.zip"
       },
-      "sha256": "b3fe61a130158caa0f6fbe3935d66fb0e47a21a044749fb5f4610a58cc94a95f",
-      "size": 26269170,
+      "sha256": "6835ca12dfaf50b171173c3f1b206049e998d97b6e6384536f689c9d39296e3f",
+      "size": 26270108,
       "executable": "bin/ds160",
-      "build_id": "c726e64c6383d7dfa94c34b8"
+      "build_id": "c7d56c5a59dc6e368046d8fb"
     },
     "bun-windows-x64": {
-      "filename": "ds160-autofill-0.3.7-bun-windows-x64.zip",
-      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-windows-x64.zip",
+      "filename": "ds160-autofill-0.3.8-bun-windows-x64.zip",
+      "url": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-windows-x64.zip",
       "sources": {
-        "github": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-windows-x64.zip",
-        "gitee": "https://gitee.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.7/ds160-autofill-0.3.7-bun-windows-x64.zip"
+        "github": "https://github.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-windows-x64.zip",
+        "gitee": "https://gitee.com/gamhoi/ds160-autofill-releases/releases/download/v0.3.8/ds160-autofill-0.3.8-bun-windows-x64.zip"
       },
-      "sha256": "74d1c2b64df23b625dfb7ce9961b6db967692015d8361f9a8e8724896c4bcd48",
-      "size": 40644945,
+      "sha256": "a9f9deb18952fe09407cd3605767f9d74a6beb6fb7d7f1455a6ffdbc9b3b8a43",
+      "size": 40645576,
       "executable": "bin/ds160.exe",
-      "build_id": "c4c05bb0a5aae1fa772345ed"
+      "build_id": "21d31fa862c711a5ec1adf10"
     }
   },
-  "previous_version": "0.3.2"
+  "previous_version": "0.3.7"
 }
