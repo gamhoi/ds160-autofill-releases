@@ -43,12 +43,12 @@ Passive check:
 
 Exercise the official installer on a dedicated test installation:
   node install-check.mjs --output <report.json> --installer <install.mjs> \\
-    --version <prerelease-version> --dest <test-skill> --driver-dir <test-driver> \\
-    --workspace <test-workspace> --browser-test
+    --version <prerelease-version> --dest <test-skill> --data-root <test-data-root> --browser-test
 
 Options:
   --output <file>             New report file; existing files are never overwritten.
   --dest <directory>          Managed Skill destination to inspect.
+  --data-root <directory>     Parent of the managed driver/ and workspace/ directories.
   --driver-dir <directory>    Dedicated Playwright driver directory to inspect.
   --workspace <directory>     Private workspace to inspect.
   --installer <file>          Explicitly execute this inspected installer.
@@ -67,6 +67,7 @@ export function parseCheckerArgs(argv) {
   const stringOptions = new Map([
     ['--output', 'output'],
     ['--dest', 'destination'],
+    ['--data-root', 'dataRoot'],
     ['--driver-dir', 'driver'],
     ['--workspace', 'workspace'],
     ['--installer', 'installer'],
@@ -86,8 +87,13 @@ export function parseCheckerArgs(argv) {
   }
   if (!values.output) throw new Error('INVALID_ARGUMENT: --output is required');
   if (values.version && values.candidateArchive) throw new Error('INVALID_ARGUMENT: choose --version or --candidate-archive');
-  if (values.installer && (!values.destination || !values.driver || !values.workspace)) {
-    throw new Error('INVALID_ARGUMENT: --installer requires --dest, --driver-dir and --workspace');
+  if (values.installer && (!values.destination || !values.dataRoot)) {
+    throw new Error('INVALID_ARGUMENT: --installer requires --dest and --data-root');
+  }
+  if (values.dataRoot && (values.driver || values.workspace)) throw new Error('INVALID_ARGUMENT: --data-root replaces --driver-dir and --workspace');
+  if (values.dataRoot) {
+    values.driver = path.join(values.dataRoot, 'driver');
+    values.workspace = path.join(values.dataRoot, 'workspace');
   }
   if ((values.version || values.candidateArchive) && !values.installer) throw new Error('INVALID_ARGUMENT: release selection requires --installer');
   if (values.browserTest && (!values.destination || !values.driver || !values.workspace)) {
@@ -477,7 +483,7 @@ export function deriveFindings(report) {
 async function exerciseInstaller(options, paths) {
   if (!options.installer) return { requested: false };
   const installer = path.resolve(options.installer);
-  const args = [installer, '--dest', path.resolve(options.destination), '--driver-dir', path.resolve(options.driver), '--workspace', path.resolve(options.workspace)];
+  const args = [installer, '--dest', path.resolve(options.destination), '--data-root', path.resolve(options.dataRoot)];
   if (options.version) args.push('--version', options.version);
   if (options.candidateArchive) args.push('--candidate-archive', path.resolve(options.candidateArchive));
   const installerHash = sha256(await readFile(installer));
@@ -510,6 +516,11 @@ async function runDoctor(options, paths) {
 }
 
 export async function createInstallReport(options) {
+  if (options.dataRoot) options = {
+    ...options,
+    driver: path.join(options.dataRoot, 'driver'),
+    workspace: path.join(options.dataRoot, 'workspace'),
+  };
   const paths = {
     destination: options.destination ? path.resolve(options.destination) : null,
     driver: options.driver ? path.resolve(options.driver) : null,

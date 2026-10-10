@@ -1,64 +1,26 @@
 # Installation Troubleshooting
 
-Use the path-policy check below before installing into newly chosen locations. Use the
-other sections if ordinary stable installation or required browser verification
-fails. Preserve the first failure and avoid speculative cleanup.
+Use this page only after the installer, `setup`, or session probe reports a failure.
+Preserve the first status and avoid speculative cleanup.
 
 ## First Checks
 
-1. Record the operating system, architecture, Agent name/version, requested Skill,
-   driver and workspace locations, installer status, error code, version, and build ID.
-2. Confirm the three directories are local and separate; siblings under one
-   permitted private root are separate. Do not assume the home directory is
-   permitted or that the Agent's current task directory is a repository.
+1. Record the operating system, architecture, Agent name/version, selected Skill
+   destination and data root, failed phase, error code, version, and build ID.
+2. Confirm that the data root is persistent, private, and local. Do not assume a
+   convenient home-directory path is permitted by the Agent host.
 3. Confirm no installer, runner, broker, or Skill-owned Chromium process is still
    active before retrying or removing a stale lock.
 4. Do not upload applicant files, photographs, browser profiles, saved PDFs, or raw
    runtime logs.
 
-## Path-Policy Check
-
-The installer atomically activates the Skill by renaming a staged directory under
-the Skill parent. It also writes the driver and workspace. Session mode atomically
-renames broker metadata inside the workspace; the runtime keeps its managed
-operation lock beside the installed Skill. Merely creating a file, passing
-`doctor --browser-test`, or installing with elevated privileges does not prove
-that later session commands have these permissions.
-
-Test the chosen Skill parent, driver directory, and workspace before installation,
-even if the host's path restrictions are not yet known. If installation used a
-different permission mode, repeat the workspace check in the mode used for
-session calls:
-
-1. Create the chosen driver and workspace directories if absent. Under each
-   tested location, create a uniquely named disposable empty directory. Do not
-   pre-create the final Skill directory; test its parent instead.
-2. Rename that directory to a new sibling name. Require creation and rename to
-   succeed. Use the same execution mode as `session probe`, `wait`, `reply`, and
-   `start`. Check whether the host silently escalated the command; an elevated
-   pass does not count for sandboxed runtime calls.
-3. If creation or rename fails, choose another private local permitted location
-   or obtain a persistent, narrowly scoped host path grant. Do not disable the
-   whole host sandbox or use a repository, cloud-synced folder, or shared volume
-   for applicant data just because it is writable.
-
-The check creates only empty disposable directories. Record their names for later
-cleanup; removal is not part of the pass/fail criterion. Some Agent hosts block
-shell deletion everywhere, even where the runtime can create and rename files.
-Do not infer that a path is unusable from `rmdir` or another shell deletion
-failure. Continue to installation and the required session probe, which exercise
-the actual lifecycle; report any cleanup failure or residue they produce. Do not
-seek a broad sandbox bypass just to remove probe directories, and do not delete
-existing Skill, driver, browser, or applicant data while testing permissions.
-Do not place a disposable probe inside the installed Skill: `session probe`
-checks its actual operation-lock lifecycle without leaving an unrelated test entry.
-
 ## Browser Verification
 
-`doctor --browser-test` proves the pinned driver, synthetic browser behavior, and the
-production-equivalent headed launcher. It does not prove that a one-shot Agent can
-keep a runner alive across later tool calls. Complete the installed runtime reference's
-`session probe --browser-test` when session mode is required.
+The installed `setup` command verifies the production profile's atomic Preferences
+write, driver, synthetic browser behavior, and headed launcher without accessing
+CEAC. A separate `session probe --browser-test` proves the broker survives across
+tool calls and repeats that profile write in the runner process. A failure in one
+permission mode is not repaired by passing a command under different privileges.
 
 Keep the Agent's system-wide sandbox enabled. On a positively identified WorkBuddy
 macOS host, the runtime reports `HOST_SANDBOX_COMPAT` and handles the known nested-
@@ -82,7 +44,7 @@ installer and browser test. Use fresh dedicated paths and the stable channel unl
 maintainer explicitly requests an exact prerelease:
 
 ```text
-node <install-check.mjs> --output <new-report.json> --installer <install.mjs> --dest <new-test-skill> --driver-dir <new-test-driver> --workspace <new-test-workspace> --browser-test
+node <install-check.mjs> --output <new-report.json> --installer <install.mjs> --dest <new-test-skill> --data-root <new-test-data-root> --browser-test
 ```
 
 The checker never creates or fills a DS-160 application. Its report is designed to
@@ -95,15 +57,33 @@ be reviewed before sharing.
   silently install a prerelease.
 - `CHROMIUM_NOT_INSTALLED` or driver mismatch: rerun the official installer against
   its managed driver directory.
+- `BROWSER_INSTALL_CACHE_LOCK_BUSY`: the shared Playwright cache lock was detected
+  before starting the browser download, or Playwright found it later. Wait for any
+  active installer; if none is active, inspect the lock and host permissions. Do
+  not remove it based only on its age. The installer never removes it automatically.
+- `BROWSER_INSTALL_CACHE_LOCK_CLEANUP_FAILED`: Playwright could not release its
+  shared cache lock. Inspect the host's file-operation policy before retrying;
+  do not repeatedly reinstall or remove the lock without verifying ownership.
+- `SETUP_PROFILE_WRITE_DENIED`: the real runner cannot atomically update its
+  dedicated browser profile in the chosen workspace. Select another persistent,
+  private data root permitted to the runtime; do not use the system temporary
+  directory for an application.
+- `INSTALL_PATH_OVERRIDE_REJECTED`: run the installed command without supplying
+  a different driver or workspace path.
 - active installation/session lock: wait for the recorded owner.
 - stale lock: prove the recorded owner exited, then remove only the documented lock.
 - `SECURE_BROWSER_LAUNCH_REQUIRES_HOST_PERMISSION`: follow the Agent host's documented
   GUI/local-execution permission flow without disabling system-wide protections.
-- `SESSION_START_FAILED` or a broker that never becomes ready: record any surfaced
-  underlying error and check workspace creation/rename permissions in the same host mode.
-  A shell deletion denial alone does not explain a broker startup failure.
-  A missing session log does not prove a process-lifetime failure. If paths work,
-  verify whether the host kills descendants at the end of a tool call.
+- `SESSION_METADATA_WRITE_DENIED`: the broker could not atomically write session
+  metadata under the current host permission. Choose a persistent private data root
+  permitted by the host, then rerun `setup` and the session probe. Do not bypass the
+  host sandbox or edit the metadata manually.
+- `SESSION_LOOPBACK_DENIED`: the host denied the local broker listener. Use a host
+  mode that permits loopback listeners; changing workspace paths will not fix it.
+- `SESSION_START_FAILED`: no specific permission error was reported. Confirm the
+  host keeps spawned processes alive across tool calls; use `--anchor` only with a
+  genuinely long-lived host background task. Do not infer failure from a shell's
+  delete prompt alone.
 - detached probe fails because the host reaps child processes: use `--anchor` only
   if it provides a genuine long-running background task. `--anchor` does not
   change filesystem permissions. Conclude that the host cannot drive the Skill

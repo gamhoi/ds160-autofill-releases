@@ -45,13 +45,17 @@ Supported platforms:
 
 Node.js 20 or newer and npm are needed only for installation and the external
 Playwright driver. The compiled runtime does not require a separate Bun installation.
-Use PowerShell for documented commands on Windows. Keep the Skill, driver, and private
-workspace in separate local directories. They may be siblings under one permitted
-private root; separate does not mean different parent trees. Do not place applicant
-data in the Skill directory or on a network/shared volume. Installation must be able to write the
-driver/workspace and atomically rename under the Skill parent. Later runtime calls
-must be able to manage the lock in the installed Skill and rename metadata in the
-workspace. A privileged install does not prove those later permissions.
+Use PowerShell for documented commands on Windows. For an ordinary installation,
+set `--dest` to `ds160-autofill` inside the Agent host's documented, persistent,
+user-level Skills directory. The host must discover it in a new task; a writable
+project or task directory is not a substitute. This does not require a system-wide
+or administrator-level installation. Choose a
+separate persistent, private, local data root that the Agent can use at runtime;
+the installer creates `driver/` and `workspace/` beneath it. A disposable task
+directory is suitable only for an isolated candidate test, not a reusable install.
+Do not put applicant files in the Skill or a synced/shared location. Installation
+under elevated permissions does not prove runtime access;
+the local and cross-call checks below verify that separately.
 
 ## Install or Update the Stable Version
 
@@ -60,29 +64,22 @@ workspace. A privileged install does not prove those later permissions.
    - GitHub: https://gamhoi.github.io/ds160-autofill-releases/install.mjs
    - Gitee: https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.mjs
 
-2. Choose paths before running the installer. Use user-specified locations if they
-   meet the requirements above. Otherwise identify the Agent host's authorized,
-   persistent local Skill and data locations; do not invent a new top-level folder
-   under the user's home directory merely because its path looks convenient. If no
-   suitable locations are known, ask the user. A task-specific folder may be
-   appropriate for a short candidate test, but not automatically for a continuing
-   installation. Do not mistake an Agent task folder for a repository or synced
-   directory solely because it is called a workspace; check its actual properties.
-   Create the chosen common parent if necessary, but do not pre-create the final
-   Skill directory.
+2. Identify the host's registered user-level Skills directory before choosing
+   `--dest`; use `<that-directory>/ds160-autofill`. A user-specified Skill path
+   qualifies only if the host will discover it across tasks. Choose a separate,
+   persistent private data root. Do not invent a top-level home directory, assume
+   a task directory is synced merely from its name, or use the system temporary
+   directory for a real application. If the registered Skill location or its write
+   permission is unclear, ask the user instead of silently installing into the
+   current project. Do not pre-create the final Skill directory. The isolated
+   candidate-test exception is in Release Testing below; it does not change the
+   destination for an ordinary stable installation.
 
-3. Before installing into newly chosen paths, complete the disposable
-   [path-policy check](docs/troubleshooting.md#path-policy-check) for the
-   Skill parent, driver, and workspace. Use the permission mode intended for later
-   `session` calls and check for silent host escalation. If the check fails, stop
-   before installation; do not move applicant files into a repository or synced
-   folder merely to gain write permission.
-
-4. Run the installer in a process session that can remain alive while Playwright and
+3. Run the installer in a process session that can remain alive while Playwright and
    Chromium are installed:
 
 ```text
-node <downloaded-install.mjs> --dest <absolute-skill-folder> --driver-dir <dedicated-driver-folder> --workspace <private-workspace>
+node <downloaded-install.mjs> --dest <absolute-skill-folder> --data-root <absolute-private-data-root>
 ```
 
 The command installs or updates only the stable version selected by `stable.json`.
@@ -92,24 +89,22 @@ Both mirrors publish the same manifest bytes and platform ZIPs; a mismatch stops
 installation instead of accepting divergent release metadata.
 It is atomic for the managed Skill: a failed activation preserves the previous
 version. Driver and workspace directories remain separate and are never replaced by
-Skill activation.
+Skill activation. Reuse the recorded data root when updating an existing Skill;
+the installer rejects a different root rather than silently switching its workspace.
 
 ## Required Verification
 
 The successful `INSTALLED` or `ALREADY_INSTALLED` JSON contains `next_steps`. Follow
-them in order:
+them in order, using the installed paths recorded by the tool:
 
 1. Read the installed `SKILL.md`.
-2. Run the exact `RUN_BROWSER_TEST` command returned by the installer.
-3. Prove the Agent's runtime channel before reading applicant material:
-   - if installation ran with different privileges, first repeat the create/rename
-     path-policy check in the workspace in the session command's actual permission
-     mode; the session probe itself checks lock management inside the installed Skill;
-   - use `run` only when the host actually returns a reusable live-process handle and
-     provides a later writable-stdin operation;
-   - otherwise follow the installed `references/runtime.md` and complete
-     `session probe --browser-test` across separate tool calls, using `--anchor` only
-     when the host requires a native long-running background task.
+2. Run the returned `VERIFY_LOCAL_SETUP` command in the permission mode intended
+   for the application. It checks resources, the production browser profile's
+   atomic write, synthetic browser behavior, and the headed launcher without CEAC.
+3. Run the returned `session probe --browser-test` across separate tool calls as
+   described in the installed `references/runtime.md`. This checks broker lifetime,
+   input delivery, and the production profile write in the actual runner process.
+   Use `--anchor` only if the host demonstrably needs a long-running background task.
 4. Generate a temporary intake reference and validate the completed profile before
    accessing CEAC.
 

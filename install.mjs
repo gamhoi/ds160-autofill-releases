@@ -24,9 +24,10 @@ SOFTWARE.
 
 // delivery/installer.mjs
 import { execFileSync } from "node:child_process";
-import { createHash, randomUUID as randomUUID2 } from "node:crypto";
-import { chmod, lstat, mkdir as mkdir2, readFile as readFile2, readdir, realpath, rename as rename2, rm as rm2, stat, writeFile as writeFile2 } from "node:fs/promises";
-import path2 from "node:path";
+import { createHash, randomUUID as randomUUID3 } from "node:crypto";
+import { chmod, lstat, mkdir as mkdir3, readFile as readFile3, readdir, realpath, rename as rename3, rm as rm3, stat, writeFile as writeFile3 } from "node:fs/promises";
+import { createRequire as createRequire2 } from "node:module";
+import path3 from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -690,6 +691,49 @@ async function withInstallationLock(destination, action) {
   return result;
 }
 
+// delivery/browser-profile-preferences.mjs
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { mkdir as mkdir2, readFile as readFile2, rename as rename2, rm as rm2, writeFile as writeFile2 } from "node:fs/promises";
+import path2 from "node:path";
+async function enforceDedicatedBrowserPrivacyPreferences(userDataDir, {
+  read = readFile2,
+  makeDirectory = mkdir2,
+  write = writeFile2,
+  move = rename2
+} = {}) {
+  const defaultDirectory = path2.join(path2.resolve(userDataDir), "Default");
+  const preferencesPath = path2.join(defaultDirectory, "Preferences");
+  let preferences = {};
+  try {
+    preferences = JSON.parse(await read(preferencesPath, "utf8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw new Error("BROWSER_PROFILE_PREFERENCES_INVALID: the dedicated Chromium Preferences file is not valid JSON.", { cause: error });
+    }
+  }
+  preferences.autofill = {
+    ...preferences.autofill && typeof preferences.autofill === "object" ? preferences.autofill : {},
+    credit_card_enabled: false,
+    profile_enabled: false
+  };
+  preferences.credentials_enable_service = false;
+  preferences.profile = {
+    ...preferences.profile && typeof preferences.profile === "object" ? preferences.profile : {},
+    password_manager_enabled: false
+  };
+  await makeDirectory(defaultDirectory, { recursive: true, mode: 448 });
+  const temporaryPath = path2.join(defaultDirectory, `.Preferences.ds160-${randomUUID2()}.tmp`);
+  await write(temporaryPath, `${JSON.stringify(preferences)}
+`, { encoding: "utf8", mode: 384, flag: "wx" });
+  try {
+    await move(temporaryPath, preferencesPath);
+  } catch (error) {
+    await rm2(temporaryPath, { force: true }).catch(() => {});
+    throw error;
+  }
+  return preferences;
+}
+
 // delivery/installer.mjs
 var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 var STATE = "install-state.json";
@@ -706,7 +750,7 @@ async function download(url, {
       throw new Error("DOWNLOAD_FILE_NOT_REGULAR");
     if (info.size > limit)
       throw new Error("DOWNLOAD_TOO_LARGE");
-    const bytes = await readFile2(file);
+    const bytes = await readFile3(file);
     if (bytes.length > limit)
       throw new Error("DOWNLOAD_TOO_LARGE");
     return bytes;
@@ -819,7 +863,7 @@ async function candidateFromArchive(file, { platform = process.platform, arch = 
   const target = `bun-${platform === "win32" ? "windows" : platform}-${arch}`;
   if (!Object.hasOwn(TARGETS, target))
     throw new Error("PLATFORM_NOT_SUPPORTED");
-  const url = pathToFileURL(path2.resolve(file)).href;
+  const url = pathToFileURL(path3.resolve(file)).href;
   const bytes = await download(url, { allowLocal: true });
   let size = 0;
   let found = false;
@@ -869,7 +913,7 @@ async function candidateFromArchive(file, { platform = process.platform, arch = 
 async function listFiles(directory) {
   const files = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const child = path2.join(directory, entry.name);
+    const child = path3.join(directory, entry.name);
     if (entry.isSymbolicLink())
       throw new Error("INSTALLATION_SYMLINK_NOT_ALLOWED");
     if (entry.isDirectory())
@@ -892,8 +936,8 @@ async function installedState(destination) {
     return null;
   if (!info.isDirectory() || info.isSymbolicLink())
     throw new Error("INSTALLATION_NOT_MANAGED");
-  const state = JSON.parse(await readFile2(path2.join(destination, STATE), "utf8").catch(() => {
-    throw new Error("INSTALLATION_NOT_MANAGED: choose a new Skill directory, not an existing directory.");
+  const state = JSON.parse(await readFile3(path3.join(destination, STATE), "utf8").catch(() => {
+    throw new Error("INSTALLATION_NOT_MANAGED: --dest must not exist for a first install; do not pre-create it. Updates require a directory already managed by this installer.");
   }));
   if (state.tool !== "ds160-runtime" || state.schema_version !== 1 || !validVersion(state.version) || !Object.hasOwn(TARGETS, state.target))
     throw new Error("INSTALLATION_STATE_INVALID");
@@ -901,15 +945,15 @@ async function installedState(destination) {
   const actual = await listFiles(destination);
   if (actual.length !== expected.size || actual.some((file) => !expected.has(file)))
     throw new Error("INSTALLATION_MODIFIED: unknown files exist; preserve them outside the Skill before updating.");
-  const metadata = JSON.parse(await readFile2(path2.join(destination, "release.json"), "utf8"));
+  const metadata = JSON.parse(await readFile3(path3.join(destination, "release.json"), "utf8"));
   if (metadata.version !== state.version || metadata.build_id !== state.build_id)
     throw new Error("INSTALLATION_STATE_INVALID: binary metadata");
-  const lines = (await readFile2(path2.join(destination, "SHA256SUMS"), "utf8")).trim().split(`
+  const lines = (await readFile3(path3.join(destination, "SHA256SUMS"), "utf8")).trim().split(`
 `);
   const checked = new Set;
   for (const line of lines) {
     const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
-    if (!match || match[2] === STATE || match[2] === "SHA256SUMS" || !expected.has(match[2]) || checked.has(match[2]) || sha256(await readFile2(path2.join(destination, match[2]))) !== match[1])
+    if (!match || match[2] === STATE || match[2] === "SHA256SUMS" || !expected.has(match[2]) || checked.has(match[2]) || sha256(await readFile3(path3.join(destination, match[2]))) !== match[1])
       throw new Error("INSTALLATION_MODIFIED: a package file has changed.");
     checked.add(match[2]);
   }
@@ -918,33 +962,33 @@ async function installedState(destination) {
   return state;
 }
 async function replaceState(directory, bytes) {
-  const temporary = path2.join(directory, `.install-state-${randomUUID2()}`);
+  const temporary = path3.join(directory, `.install-state-${randomUUID3()}`);
   try {
-    await writeFile2(temporary, bytes, { mode: 384, flag: "wx" });
-    await rename2(temporary, path2.join(directory, STATE));
+    await writeFile3(temporary, bytes, { mode: 384, flag: "wx" });
+    await rename3(temporary, path3.join(directory, STATE));
   } finally {
-    await rm2(temporary, { force: true });
+    await rm3(temporary, { force: true });
   }
 }
 function outside(destination, directory) {
-  const relative = path2.relative(destination, directory);
-  if (!relative || !relative.startsWith(`..${path2.sep}`) && relative !== ".." && !path2.isAbsolute(relative))
+  const relative = path3.relative(destination, directory);
+  if (!relative || !relative.startsWith(`..${path3.sep}`) && relative !== ".." && !path3.isAbsolute(relative))
     throw new Error("DATA_DIRECTORY_INSIDE_SKILL");
 }
 function previousDirectory(destination, state) {
   const name = state?.previous?.directory;
   if (!name)
     return null;
-  if (path2.basename(name) !== name || !name.startsWith(`.${path2.basename(destination)}.previous-`) || !/previous-[a-f0-9-]{36}$/.test(name))
+  if (path3.basename(name) !== name || !name.startsWith(`.${path3.basename(destination)}.previous-`) || !/previous-[a-f0-9-]{36}$/.test(name))
     throw new Error("INSTALLATION_STATE_INVALID: previous directory");
-  return path2.join(path2.dirname(destination), name);
+  return path3.join(path3.dirname(destination), name);
 }
 async function findNpmCli() {
-  const candidates = [process.env.npm_execpath, path2.join(path2.dirname(process.execPath), "node_modules/npm/bin/npm-cli.js")];
-  for (const directory of (process.env.PATH || "").split(path2.delimiter)) {
-    candidates.push(path2.join(directory, "node_modules/npm/bin/npm-cli.js"));
+  const candidates = [process.env.npm_execpath, path3.join(path3.dirname(process.execPath), "node_modules/npm/bin/npm-cli.js")];
+  for (const directory of (process.env.PATH || "").split(path3.delimiter)) {
+    candidates.push(path3.join(directory, "node_modules/npm/bin/npm-cli.js"));
     if (process.platform !== "win32")
-      candidates.push(await realpath(path2.join(directory, "npm")).catch(() => null));
+      candidates.push(await realpath(path3.join(directory, "npm")).catch(() => null));
   }
   for (const file of candidates.filter(Boolean))
     if (file.endsWith("npm-cli.js") && await stat(file).then((s) => s.isFile(), () => false))
@@ -974,12 +1018,55 @@ function executeStage(execute, stage, program, args, timeoutMs) {
     const commandOutput = [cause?.message, cause?.stdout, cause?.stderr].filter(Boolean).join(`
 `);
     const lockCleanupFailed = /__dirlock/iu.test(commandOutput) && /\b(?:EPERM|EACCES|ENOTEMPTY)\b|operation not permitted|safe[-_ ]?delete|\brmdir\b/iu.test(commandOutput);
-    const code = timedOut ? `${stage}_TIMEOUT` : lockCleanupFailed ? `${stage}_CACHE_LOCK_CLEANUP_FAILED` : `${stage}_FAILED`;
-    const detail = timedOut ? `exceeded ${Math.round(timeoutMs / 60000)} minutes` : lockCleanupFailed ? "browser assets may be complete, but the shared cache lock could not be released" : `dependency command exited unsuccessfully (${cause?.code || cause?.status || "unknown status"})`;
+    const lockBusy = /__dirlock/iu.test(commandOutput) && /\bEEXIST\b/iu.test(commandOutput);
+    const code = timedOut ? `${stage}_TIMEOUT` : lockCleanupFailed ? `${stage}_CACHE_LOCK_CLEANUP_FAILED` : lockBusy ? `${stage}_CACHE_LOCK_BUSY` : `${stage}_FAILED`;
+    const detail = timedOut ? `exceeded ${Math.round(timeoutMs / 60000)} minutes` : lockCleanupFailed ? "browser assets may be complete, but the shared cache lock could not be released" : lockBusy ? "the shared Playwright browser cache lock already exists; do not remove it without checking its owner" : `dependency command exited unsuccessfully (${cause?.code || cause?.status || "unknown status"})`;
     const error = new Error(`${code}: ${detail}.`, { cause });
     error.errorCode = code;
     throw error;
   }
+}
+function browserCacheLockPathFromExecutable(executablePath, platform = process.platform) {
+  const paths = platform === "win32" ? path3.win32 : path3.posix;
+  let directory = paths.dirname(executablePath);
+  while (directory !== paths.dirname(directory)) {
+    if (/^chromium-\d+$/u.test(paths.basename(directory)))
+      return paths.join(paths.dirname(directory), "__dirlock");
+    directory = paths.dirname(directory);
+  }
+  return null;
+}
+async function checkBrowserCacheLock(driver, { loadPlaywright = (root) => createRequire2(path3.join(root, "package.json"))("playwright"), inspect = lstat } = {}) {
+  let lockPath;
+  try {
+    lockPath = browserCacheLockPathFromExecutable(loadPlaywright(driver).chromium.executablePath());
+  } catch {
+    return;
+  }
+  if (!lockPath)
+    return;
+  const lock = await inspect(lockPath).catch((error) => {
+    if (["ENOENT", "EACCES", "EPERM"].includes(error.code))
+      return null;
+    throw error;
+  });
+  if (lock)
+    throw new Error("BROWSER_INSTALL_CACHE_LOCK_BUSY: the shared Playwright browser cache lock is present; wait for an active install or inspect it before retrying. The lock was not modified.");
+}
+function installationFailure(error) {
+  const error_code = /^[A-Z][A-Z0-9_]+:/u.exec(error.message)?.[0].slice(0, -1) || error.code || "INSTALLATION_FAILED";
+  const result = { status: "INSTALLATION_FAILED", error_code, error: error.message };
+  if (["BROWSER_INSTALL_CACHE_LOCK_BUSY", "BROWSER_INSTALL_CACHE_LOCK_CLEANUP_FAILED"].includes(error_code)) {
+    result.next_steps = [
+      { action: "WAIT_FOR_ACTIVE_PLAYWRIGHT_INSTALL", detail: "If another browser installation is active, let it finish before retrying." },
+      { action: "INSPECT_SHARED_PLAYWRIGHT_CACHE_LOCK", detail: "If no install is active, inspect the lock and host permissions; never remove it based only on age." },
+      { action: "RETRY_ORIGINAL_INSTALL_AFTER_LOCK_RESOLVES", references: [
+        "https://gamhoi.github.io/ds160-autofill-releases/docs/troubleshooting.md",
+        "https://gitee.com/gamhoi/ds160-autofill-releases/blob/master/docs/troubleshooting.md"
+      ] }
+    ];
+  }
+  return result;
 }
 async function prepareDriver(executable, driver, workspace, skipDependencies, execute) {
   const warnings = [];
@@ -990,12 +1077,12 @@ async function prepareDriver(executable, driver, workspace, skipDependencies, ex
   } catch {}
   if (skipDependencies)
     throw new Error("DRIVER_NOT_READY: --skip-dependencies requires an already working driver.");
-  await mkdir2(driver, { recursive: true, mode: 448 });
-  const marker = path2.join(driver, ".ds160-driver-managed");
+  await mkdir3(driver, { recursive: true, mode: 448 });
+  const marker = path3.join(driver, ".ds160-driver-managed");
   const entries = await readdir(driver);
   if (entries.length && !entries.includes(".ds160-driver-managed"))
     throw new Error("DRIVER_DIRECTORY_NOT_MANAGED: repair it explicitly or choose a dedicated new directory.");
-  await writeFile2(marker, `ds160-runtime
+  await writeFile3(marker, `ds160-runtime
 `, { mode: 384 });
   const npm = await findNpmCli();
   executeStage(execute, "NPM_INSTALL", process.execPath, [npm, "install", "--prefix", driver, "--save-exact", "--no-audit", "--no-fund", `playwright@${CONTRACT.playwright}`], EXECUTION_TIMEOUTS.npm);
@@ -1005,8 +1092,9 @@ async function prepareDriver(executable, driver, workspace, skipDependencies, ex
       return warnings;
     }
   } catch {}
+  await checkBrowserCacheLock(driver);
   try {
-    executeStage(execute, "BROWSER_INSTALL", process.execPath, [path2.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
+    executeStage(execute, "BROWSER_INSTALL", process.execPath, [path3.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
   } catch (error) {
     let ready = false;
     try {
@@ -1028,45 +1116,63 @@ async function install(manifest, options, {
   fetchBytes = download,
   platform = process.platform,
   arch = process.arch,
-  remove = rm2
+  remove = rm3,
+  prepareProfile = enforceDedicatedBrowserPrivacyPreferences
 } = {}) {
   assertManifest(manifest, { allowLocal: Boolean(options.allowLocal), requireStable: !options.allowLocal && !options.allowPrerelease });
   const target = `bun-${platform === "win32" ? "windows" : platform}-${arch}`;
   if (!Object.hasOwn(TARGETS, target) || !manifest.artifacts[target])
     throw new Error("PLATFORM_NOT_SUPPORTED");
-  const destination = path2.resolve(options.destination);
-  await mkdir2(path2.dirname(destination), { recursive: true });
+  const destination = path3.resolve(options.destination);
+  await mkdir3(path3.dirname(destination), { recursive: true });
   return withInstallationLock(destination, async () => {
     const old = await installedState(destination);
     if (old && old.target !== target)
       throw new Error("INSTALLATION_PLATFORM_MISMATCH");
     if (old && compareVersions(manifest.version, old.version) < 0 && !options.allowDowngrade)
       throw new Error("DOWNGRADE_REQUIRES_EXPLICIT_PERMISSION");
-    const driver = path2.resolve(options.driver || old?.driver_dir || path2.join(path2.dirname(destination), "ds160-driver"));
-    const workspace = path2.resolve(options.workspace || old?.workspace || path2.join(path2.dirname(destination), "ds160-workspace"));
+    const dataRoot = options.dataRoot ? path3.resolve(options.dataRoot) : null;
+    const driver = path3.resolve(dataRoot ? path3.join(dataRoot, "driver") : options.driver || old?.driver_dir || path3.join(path3.dirname(destination), "ds160-driver"));
+    const workspace = path3.resolve(dataRoot ? path3.join(dataRoot, "workspace") : options.workspace || old?.workspace || path3.join(path3.dirname(destination), "ds160-workspace"));
     outside(destination, driver);
     outside(destination, workspace);
+    if (old && dataRoot && (path3.resolve(old.driver_dir) !== driver || path3.resolve(old.workspace) !== workspace)) {
+      throw new Error("INSTALL_DATA_ROOT_MISMATCH: this Skill is already bound to different driver/workspace paths. Preserve the existing installation or use a new Skill destination.");
+    }
+    if (dataRoot) {
+      await mkdir3(dataRoot, { recursive: true, mode: 448 });
+      if ((await lstat(dataRoot)).isSymbolicLink())
+        throw new Error("DATA_ROOT_SYMLINK_NOT_ALLOWED");
+      await mkdir3(workspace, { recursive: true, mode: 448 });
+      if ((await lstat(workspace)).isSymbolicLink())
+        throw new Error("WORKSPACE_SYMLINK_NOT_ALLOWED");
+      try {
+        await prepareProfile(path3.join(workspace, ".ds160-browser-profile"));
+      } catch (cause) {
+        if (cause?.code === "EPERM" || cause?.code === "EACCES") {
+          throw new Error("INSTALL_DATA_ROOT_DENIED: the production browser profile cannot complete its atomic Preferences write.", { cause });
+        }
+        throw cause;
+      }
+      console.error(JSON.stringify({ status: "INSTALL_STAGE", stage: "DATA_ROOT", phase: "VERIFIED" }));
+    }
     const artifact = manifest.artifacts[target];
     const nextSteps = () => {
-      const executable = path2.join(destination, artifact.executable);
+      const executable = path3.join(destination, artifact.executable);
       return [
-        { action: "READ_INSTALLED_SKILL", path: path2.join(destination, "SKILL.md") },
-        {
-          action: "RUN_BROWSER_TEST",
-          program: executable,
-          args: ["doctor", "--driver-dir", driver, "--workspace", workspace, "--browser-test"]
-        },
+        { action: "READ_INSTALLED_SKILL", path: path3.join(destination, "SKILL.md") },
+        { action: "VERIFY_LOCAL_SETUP", program: executable, args: ["setup"] },
         {
           action: "PROVE_RUNTIME_CHANNEL",
-          reference: path2.join(destination, "references", "runtime.md"),
-          preferred: "persistent_writable_stdin",
-          fallback: "session_probe_browser_test"
+          reference: path3.join(destination, "references", "runtime.md"),
+          program: executable,
+          args: ["session", "probe", "--browser-test"]
         },
         { action: "VALIDATE_PROFILE_BEFORE_CEAC" }
       ];
     };
     if (old?.archive_sha256 === artifact.sha256 && old.driver_dir === driver && old.workspace === workspace) {
-      const warnings = await prepareDriver(path2.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute);
+      const warnings = await prepareDriver(path3.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute);
       return {
         status: "ALREADY_INSTALLED",
         version: old.version,
@@ -1081,21 +1187,21 @@ async function install(manifest, options, {
       allowLocal: options.allowLocal,
       timeoutMs: 10 * 60000
     }), artifact, manifest);
-    const staging = path2.join(path2.dirname(destination), `.${path2.basename(destination)}.staging-${randomUUID2()}`);
-    const backup = path2.join(path2.dirname(destination), `.${path2.basename(destination)}.previous-${randomUUID2()}`);
+    const staging = path3.join(path3.dirname(destination), `.${path3.basename(destination)}.staging-${randomUUID3()}`);
+    const backup = path3.join(path3.dirname(destination), `.${path3.basename(destination)}.previous-${randomUUID3()}`);
     let movedOld = false;
     let activated = false;
     let primaryError = null;
     try {
-      await mkdir2(staging, { mode: 448 });
+      await mkdir3(staging, { mode: 448 });
       for (const [relative, bytes] of Object.entries(files)) {
-        const file = path2.join(staging, relative);
-        await mkdir2(path2.dirname(file), { recursive: true, mode: 448 });
-        await writeFile2(file, bytes, { mode: relative === artifact.executable ? 493 : 420, flag: "wx" });
+        const file = path3.join(staging, relative);
+        await mkdir3(path3.dirname(file), { recursive: true, mode: 448 });
+        await writeFile3(file, bytes, { mode: relative === artifact.executable ? 493 : 420, flag: "wx" });
         if (relative === artifact.executable)
           await chmod(file, 493);
       }
-      const executable = path2.join(staging, artifact.executable);
+      const executable = path3.join(staging, artifact.executable);
       const version = JSON.parse(execute(executable, ["version"]));
       if (version.version !== manifest.version || version.build_id !== artifact.build_id)
         throw new Error("BINARY_IDENTITY_MISMATCH");
@@ -1111,25 +1217,25 @@ async function install(manifest, options, {
         driver_dir: driver,
         workspace,
         installed_at: new Date().toISOString(),
-        previous: old ? { directory: path2.basename(backup), version: old.version } : null
+        previous: old ? { directory: path3.basename(backup), version: old.version } : null
       };
-      await writeFile2(path2.join(staging, STATE), `${JSON.stringify(state, null, 2)}
+      await writeFile3(path3.join(staging, STATE), `${JSON.stringify(state, null, 2)}
 `, { mode: 384, flag: "wx" });
       if (old) {
         const fresh = await installedState(destination);
         if (fresh.archive_sha256 !== old.archive_sha256)
           throw new Error("INSTALLATION_CHANGED");
-        await rename2(destination, backup);
+        await rename3(destination, backup);
         movedOld = true;
       }
-      await rename2(staging, destination);
+      await rename3(staging, destination);
       activated = true;
       const older = previousDirectory(destination, old);
       const warnings = [...driverWarnings];
       if (older) {
         try {
           await installedState(older);
-          await rm2(older, { recursive: true });
+          await rm3(older, { recursive: true });
         } catch {
           warnings.push("PREVIOUS_COPY_PRESERVED: could not safely clean an older backup.");
         }
@@ -1147,7 +1253,7 @@ async function install(manifest, options, {
     } catch (error) {
       primaryError = error;
       if (movedOld && !activated)
-        await rename2(backup, destination);
+        await rename3(backup, destination);
       throw error;
     } finally {
       if (!activated) {
@@ -1166,7 +1272,7 @@ async function install(manifest, options, {
   });
 }
 async function rollback(destination, { execute = defaultExecute } = {}) {
-  destination = path2.resolve(destination);
+  destination = path3.resolve(destination);
   return withInstallationLock(destination, async () => {
     const current = await installedState(destination);
     const previous = previousDirectory(destination, current);
@@ -1175,24 +1281,24 @@ async function rollback(destination, { execute = defaultExecute } = {}) {
     const state = await installedState(previous);
     if (state.profile_contract !== current.profile_contract || state.target !== current.target)
       throw new Error("ROLLBACK_CONTRACT_INCOMPATIBLE");
-    const executable = path2.join(previous, TARGETS[state.target].executable);
+    const executable = path3.join(previous, TARGETS[state.target].executable);
     if (JSON.parse(execute(executable, ["doctor", "--driver-dir", current.driver_dir, "--workspace", current.workspace])).status !== "READY")
       throw new Error("ROLLBACK_DRIVER_NOT_READY");
-    const backup = path2.join(path2.dirname(destination), `.${path2.basename(destination)}.previous-${randomUUID2()}`);
+    const backup = path3.join(path3.dirname(destination), `.${path3.basename(destination)}.previous-${randomUUID3()}`);
     state.driver_dir = current.driver_dir;
     state.workspace = current.workspace;
-    state.previous = { directory: path2.basename(backup), version: current.version };
-    const originalState = await readFile2(path2.join(previous, STATE));
+    state.previous = { directory: path3.basename(backup), version: current.version };
+    const originalState = await readFile3(path3.join(previous, STATE));
     await replaceState(previous, `${JSON.stringify(state, null, 2)}
 `);
     let moved = false;
     try {
-      await rename2(destination, backup);
+      await rename3(destination, backup);
       moved = true;
-      await rename2(previous, destination);
+      await rename3(previous, destination);
     } catch (error) {
       if (moved)
-        await rename2(backup, destination);
+        await rename3(backup, destination);
       await replaceState(previous, originalState);
       throw error;
     }
@@ -1200,7 +1306,7 @@ async function rollback(destination, { execute = defaultExecute } = {}) {
   });
 }
 async function uninstall(destination) {
-  destination = path2.resolve(destination);
+  destination = path3.resolve(destination);
   return withInstallationLock(destination, async () => {
     const current = await installedState(destination);
     if (!current)
@@ -1210,23 +1316,23 @@ async function uninstall(destination) {
       await installedState(previous);
     const removals = [destination, ...previous ? [previous] : []].map((source) => ({
       source,
-      quarantined: path2.join(path2.dirname(source), `.${path2.basename(source)}.removing-${randomUUID2()}`)
+      quarantined: path3.join(path3.dirname(source), `.${path3.basename(source)}.removing-${randomUUID3()}`)
     }));
     const moved = [];
     try {
       for (const entry of removals) {
-        await rename2(entry.source, entry.quarantined);
+        await rename3(entry.source, entry.quarantined);
         moved.push(entry);
       }
     } catch (error) {
       for (const entry of moved.reverse())
-        await rename2(entry.quarantined, entry.source).catch(() => {});
+        await rename3(entry.quarantined, entry.source).catch(() => {});
       throw error;
     }
     const warnings = [];
     for (const entry of removals) {
       try {
-        await rm2(entry.quarantined, { recursive: true });
+        await rm3(entry.quarantined, { recursive: true });
       } catch {
         warnings.push(`UNINSTALL_RESIDUAL_PRESERVED: ${entry.quarantined}`);
       }
@@ -1246,6 +1352,7 @@ async function main(argv = process.argv.slice(2)) {
     throw new Error("NODE_VERSION_UNSUPPORTED: use Node.js 20 or newer.");
   const { values, tokens } = parseArgs({ args: argv, tokens: true, options: {
     dest: { type: "string" },
+    "data-root": { type: "string" },
     "driver-dir": { type: "string" },
     workspace: { type: "string" },
     version: { type: "string" },
@@ -1267,16 +1374,18 @@ async function main(argv = process.argv.slice(2)) {
       seen.add(token.name);
     }
   if (values.help) {
-    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> [--source auto|github|gitee] [--driver-dir <dir>] [--workspace <dir>] [--version <exact-public-version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback | --uninstall]
-Without --source, the installer compares the two official mirrors and uses the faster available one. Explicit --source selects only that mirror. --candidate-archive installs an explicitly trusted local candidate. --skip-dependencies requires a working existing driver. --uninstall preserves driver and workspace data.`);
+    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> --data-root <absolute-private-data-directory> [--source auto|github|gitee] [--version <exact-public-version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback | --uninstall]
+For a first install, --dest must not exist; do not pre-create it. Updates reuse a directory managed by this installer. The installer derives driver/ and workspace/ beneath --data-root. --candidate-archive installs an explicitly trusted local candidate. --uninstall preserves driver and workspace data.`);
     return;
   }
   for (const key of ["version", "source", "manifest-file", "candidate-archive"]) {
     if (seen.has(key) && !values[key])
       throw new Error(`INVALID_ARGUMENT: empty --${key}`);
   }
-  if (!values.dest || !path2.isAbsolute(values.dest))
+  if (!values.dest || !path3.isAbsolute(values.dest))
     throw new Error("DESTINATION_REQUIRED: provide the absolute target Agent Skill directory.");
+  if (values["driver-dir"] || values.workspace)
+    throw new Error("INVALID_ARGUMENT: use --data-root instead of separate driver/workspace paths.");
   if ([values.check, values.rollback, values.uninstall].filter(Boolean).length > 1)
     throw new Error("INVALID_ARGUMENT: choose one of check, rollback or uninstall");
   if (values.rollback && (values.version || values.source || values["manifest-file"] || values["candidate-archive"]))
@@ -1286,13 +1395,15 @@ Without --source, the installer compares the two official mirrors and uses the f
     return;
   }
   if (values.uninstall) {
-    if (values.version || values.source || values["manifest-file"] || values["candidate-archive"] || values["driver-dir"] || values.workspace || values["skip-dependencies"] || values["allow-downgrade"])
+    if (values.version || values.source || values["manifest-file"] || values["candidate-archive"] || values["data-root"] || values["skip-dependencies"] || values["allow-downgrade"])
       throw new Error("INVALID_ARGUMENT: uninstall accepts only --dest");
     console.log(JSON.stringify(await uninstall(values.dest)));
     return;
   }
   if (values.version && !validVersion(values.version))
     throw new Error("VERSION_INVALID");
+  if (!values.check && (!values["data-root"] || !path3.isAbsolute(values["data-root"])))
+    throw new Error("DATA_ROOT_REQUIRED: provide an absolute persistent private data directory.");
   if ([values.version, values["manifest-file"], values["candidate-archive"]].filter(Boolean).length > 1)
     throw new Error("INVALID_ARGUMENT: choose one of version, manifest-file or candidate-archive");
   if (values.source && !["auto", ...Object.keys(SOURCES)].includes(values.source))
@@ -1302,7 +1413,7 @@ Without --source, the installer compares the two official mirrors and uses the f
   const candidate = values["candidate-archive"] ? await candidateFromArchive(values["candidate-archive"]) : null;
   const allowLocal = Boolean(values["manifest-file"] || candidate);
   const remote = allowLocal ? null : await resolvePublicManifest(values.version, values.source || "auto");
-  const manifest = candidate?.manifest || (values["manifest-file"] ? JSON.parse(await download(pathToFileURL(path2.resolve(values["manifest-file"])).href, { allowLocal: true, limit: 1024 * 1024 })) : remote.manifest);
+  const manifest = candidate?.manifest || (values["manifest-file"] ? JSON.parse(await download(pathToFileURL(path3.resolve(values["manifest-file"])).href, { allowLocal: true, limit: 1024 * 1024 })) : remote.manifest);
   if (values.version && manifest.version !== values.version)
     throw new Error("MANIFEST_VERSION_MISMATCH");
   assertManifest(manifest, { allowLocal, requireStable: !allowLocal && !values.version });
@@ -1310,7 +1421,7 @@ Without --source, the installer compares the two official mirrors and uses the f
   if (!Object.hasOwn(TARGETS, target) || !manifest.artifacts[target])
     throw new Error("PLATFORM_NOT_SUPPORTED");
   if (values.check) {
-    const current = await installedState(path2.resolve(values.dest));
+    const current = await installedState(path3.resolve(values.dest));
     const comparison = current ? compareVersions(manifest.version, current.version) : 1;
     console.log(JSON.stringify({
       status: "UPDATE_CHECKED",
@@ -1323,8 +1434,7 @@ Without --source, the installer compares the two official mirrors and uses the f
   console.error("DS-160 Autofill B1/B2: personal use is permanently free. No applicant data is uploaded to a developer backend; local files are sent only to CEAC and its official photo service when you perform filling. See LICENSE.txt and PRIVACY.md after installation.");
   console.log(JSON.stringify(await install(manifest, {
     destination: values.dest,
-    driver: values["driver-dir"],
-    workspace: values.workspace,
+    dataRoot: values["data-root"],
     skipDependencies: values["skip-dependencies"],
     allowDowngrade: values["allow-downgrade"],
     allowLocal,
@@ -1336,6 +1446,6 @@ Without --source, the installer compares the two official mirrors and uses the f
 try {
   await main();
 } catch (error) {
-  console.error(JSON.stringify({ status: "INSTALLATION_FAILED", error: error.message }));
+  console.error(JSON.stringify(installationFailure(error)));
   process.exitCode = 1;
 }

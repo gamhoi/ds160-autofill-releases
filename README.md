@@ -23,6 +23,8 @@ https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.md
 
 Use only the guide's public installer. Installation does not authorize filling,
 electronic signing, or submission; ask me separately before each of those actions.
+Install the Skill in this Agent host's persistent user-level Skills directory so
+it is available in later tasks, with a separate private local data directory.
 ```
 
 2. After the Agent reports that installation, the browser test, and the runtime
