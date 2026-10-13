@@ -113,3 +113,27 @@ Platform packages and immutable manifests are published under
 questions, compatibility reports, or feature requests, open an issue in this
 repository. Do not attach applicant profiles, photos, CAPTCHA images, logs containing
 answers, or downloaded application documents.
+
+## Support the Project
+
+DS-160 Autofill is completely free for personal, non-commercial use.
+
+If this tool saved you time, you can buy the developer a coffee to support ongoing
+maintenance and updates.
+
+**Support is entirely optional and does not affect any functionality.**
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="assets/alipay-support.png"><img src="assets/alipay-support.png" width="232" alt="Alipay payment QR code"></a><br>
+      <strong>Alipay</strong>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://buymeacoffee.com/gamhoi"><img src="assets/buy-me-a-coffee.png" width="310" alt="Buy Me a Coffee"></a><br>
+      <strong>Buy Me a Coffee</strong>
+    </td>
+  </tr>
+</table>
+
+Commercial use requires separate authorization.

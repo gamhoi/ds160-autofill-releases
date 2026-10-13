@@ -102,3 +102,26 @@ Playwright 和 Chrome for Testing 会独立安装，并固定到受支持的版�
 [Gitee Releases](https://gitee.com/gamhoi/ds160-autofill-releases/releases)。如有问题、
 兼容性报告或功能建议，请在本仓库提交 Issue。不要在 Issue 中附加申请人 profile、照片、
 验证码图片、包含答案的日志或下载的申请文件。
+
+## 支持项目
+
+DS-160 Autofill 对个人非商业使用完全免费。
+
+如果这个工具帮你节省了时间，欢迎请开发者喝杯咖啡，支持后续维护和更新。
+
+**赞赏完全自愿，不影响任何功能的正常使用。**
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="assets/alipay-support.png"><img src="assets/alipay-support.png" width="232" alt="支付宝收钱码"></a><br>
+      <strong>支付宝</strong>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://buymeacoffee.com/gamhoi"><img src="assets/buy-me-a-coffee.png" width="310" alt="Buy Me a Coffee"></a><br>
+      <strong>Buy Me a Coffee</strong>
+    </td>
+  </tr>
+</table>
+
+商业用途需要单独授权。
