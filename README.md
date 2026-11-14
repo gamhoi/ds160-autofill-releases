@@ -2,7 +2,8 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A local Agent Skill for assisted DS-160 B1/B2 preparation and form filling.
+An Agent Skill for assisted DS-160 B1/B2 preparation and form filling on
+desktop or online Agents.
 Personal B1/B2 use is permanently free.
 
 The Skill turns applicant material into a validated local profile, operates the
@@ -13,7 +14,7 @@ Department of State.
 
 ## Quick Start
 
-1. Send this prompt to an Agent with a terminal and a headed browser or Linux Xvfb:
+1. Send this prompt to your desktop or online Agent:
 
 ```text
 Please install or update the DS-160 B1/B2 Skill using its official guide:
@@ -56,11 +57,11 @@ downloaded confirmation document.
 
 ```mermaid
 flowchart LR
-  U[Applicant] <--> A[Local Agent]
-  A <--> R[Local DS-160 runner]
+  U[Applicant] <--> A[Agent]
+  A <--> R[DS-160 runner]
   R <--> B[Playwright + dedicated Chromium]
   B <--> S[Official state.gov services]
-  R <--> W[Private local workspace]
+  R <--> W[Private workspace]
 ```
 
 There is no project-operated applicant-data backend. Applicant files remain in the
