@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-这是一个在本地运行的 Agent Skill，用于协助准备和填写 DS-160 B1/B2 申请表。
+这是一个支持桌面版和网页版 Agent 的 Skill，用于协助准备和填写 DS-160 B1/B2 申请表。
 个人 B1/B2 用途永久免费。
 
 Skill 会把申请材料整理成经过校验的本地 profile，通过独立且可见的浏览器操作
@@ -11,7 +11,7 @@ Skill 会把申请材料整理成经过校验的本地 profile，通过独立且
 
 ## 快速开始
 
-1. 把下面这段话发送给拥有终端及有头浏览器或 Linux Xvfb 的 Agent：
+1. 把下面这段话发给桌面版或网页版 Agent：
 
 ```text
 请按照 DS-160 B1/B2 Skill 的官方指南安装或更新：
@@ -49,11 +49,11 @@ Agent 安装协议位于 [install.md](install.md)。安装器会读取 `stable.j
 
 ```mermaid
 flowchart LR
-  U[申请人] <--> A[本地 Agent]
-  A <--> R[本地 DS-160 Runner]
+  U[申请人] <--> A[Agent]
+  A <--> R[DS-160 Runner]
   R <--> B[Playwright + 独立 Chromium]
   B <--> S[官方 state.gov 服务]
-  R <--> W[本地私有工作区]
+  R <--> W[私有工作区]
 ```
 
 项目不运行用于接收申请人资料的后台服务。申请文件保留在运行时工作区，可能位于
