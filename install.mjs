@@ -460,7 +460,8 @@ var LEGACY_LICENSE_032 = Object.freeze({
 var TARGETS = Object.freeze({
   "bun-darwin-x64": { platform: "darwin", arch: "x64", executable: "bin/ds160" },
   "bun-darwin-arm64": { platform: "darwin", arch: "arm64", executable: "bin/ds160" },
-  "bun-windows-x64": { platform: "win32", arch: "x64", executable: "bin/ds160.exe" }
+  "bun-windows-x64": { platform: "win32", arch: "x64", executable: "bin/ds160.exe" },
+  "bun-linux-x64": { platform: "linux", arch: "x64", executable: "bin/ds160" }
 });
 var LEGACY_PUBLIC_FILES = Object.freeze([
   "SKILL.md",
@@ -481,7 +482,7 @@ var LEGACY_PUBLIC_FILES = Object.freeze([
   "references/setup.md",
   "references/photo.md"
 ]);
-var PUBLIC_FILES = Object.freeze([
+var PRE_LINUX_PUBLIC_FILES = Object.freeze([
   "SKILL.md",
   "README.md",
   "install.md",
@@ -503,7 +504,8 @@ var PUBLIC_FILES = Object.freeze([
   "references/setup-windows.md",
   "references/photo.md"
 ]);
-var publicFilesForVersion = (version) => compareVersions(version, "0.3.7") < 0 ? LEGACY_PUBLIC_FILES : PUBLIC_FILES;
+var PUBLIC_FILES = Object.freeze([...PRE_LINUX_PUBLIC_FILES, "references/setup-linux.md"]);
+var publicFilesForVersion = (version) => compareVersions(version, "0.3.7") < 0 ? LEGACY_PUBLIC_FILES : compareVersions(version, "0.3.9") < 0 ? PRE_LINUX_PUBLIC_FILES : PUBLIC_FILES;
 var RETENTION = Object.freeze({ stable_count: 5, stable_days: 90, prerelease_days: 14, artifact_days: 7 });
 var validVersion = (value) => typeof value === "string" && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[a-zA-Z0-9]+(?:[.-][a-zA-Z0-9]+)*)?$/.test(value);
 function assertManifest(manifest, { allowLocal = false, requireStable = false } = {}) {
@@ -1068,48 +1070,64 @@ function installationFailure(error) {
   }
   return result;
 }
-async function prepareDriver(executable, driver, workspace, skipDependencies, execute) {
-  const warnings = [];
-  const doctor = () => JSON.parse(execute(executable, ["doctor", "--driver-dir", driver, "--workspace", workspace], { timeoutMs: EXECUTION_TIMEOUTS.doctor, stage: "DRIVER_CHECK" }));
+async function prepareDriver(executable, driver, workspace, skipDependencies, execute, browserCacheDir = null) {
+  const previousBrowserPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (browserCacheDir) {
+    await mkdir3(browserCacheDir, { recursive: true, mode: 448 });
+    if ((await lstat(browserCacheDir)).isSymbolicLink())
+      throw new Error("BROWSER_CACHE_SYMLINK_NOT_ALLOWED");
+    process.env.PLAYWRIGHT_BROWSERS_PATH = browserCacheDir;
+  }
   try {
-    if (doctor().status === "READY")
-      return warnings;
-  } catch {}
-  if (skipDependencies)
-    throw new Error("DRIVER_NOT_READY: --skip-dependencies requires an already working driver.");
-  await mkdir3(driver, { recursive: true, mode: 448 });
-  const marker = path3.join(driver, ".ds160-driver-managed");
-  const entries = await readdir(driver);
-  if (entries.length && !entries.includes(".ds160-driver-managed"))
-    throw new Error("DRIVER_DIRECTORY_NOT_MANAGED: repair it explicitly or choose a dedicated new directory.");
-  await writeFile3(marker, `ds160-runtime
+    const warnings = [];
+    const doctor = () => JSON.parse(execute(executable, ["doctor", "--driver-dir", driver, "--workspace", workspace], { timeoutMs: EXECUTION_TIMEOUTS.doctor, stage: "DRIVER_CHECK" }));
+    try {
+      if (doctor().status === "READY")
+        return warnings;
+    } catch {}
+    if (skipDependencies)
+      throw new Error("DRIVER_NOT_READY: --skip-dependencies requires an already working driver.");
+    await mkdir3(driver, { recursive: true, mode: 448 });
+    const marker = path3.join(driver, ".ds160-driver-managed");
+    const entries = await readdir(driver);
+    if (entries.length && !entries.includes(".ds160-driver-managed"))
+      throw new Error("DRIVER_DIRECTORY_NOT_MANAGED: repair it explicitly or choose a dedicated new directory.");
+    await writeFile3(marker, `ds160-runtime
 `, { mode: 384 });
-  const npm = await findNpmCli();
-  executeStage(execute, "NPM_INSTALL", process.execPath, [npm, "install", "--prefix", driver, "--save-exact", "--no-audit", "--no-fund", `playwright@${CONTRACT.playwright}`], EXECUTION_TIMEOUTS.npm);
-  try {
-    if (doctor().status === "READY") {
-      console.error(JSON.stringify({ status: "INSTALL_STAGE", stage: "BROWSER_INSTALL", phase: "VERIFIED_EXISTING" }));
+    const npm = await findNpmCli();
+    executeStage(execute, "NPM_INSTALL", process.execPath, [npm, "install", "--prefix", driver, "--save-exact", "--no-audit", "--no-fund", `playwright@${CONTRACT.playwright}`], EXECUTION_TIMEOUTS.npm);
+    try {
+      if (doctor().status === "READY") {
+        console.error(JSON.stringify({ status: "INSTALL_STAGE", stage: "BROWSER_INSTALL", phase: "VERIFIED_EXISTING" }));
+        return warnings;
+      }
+    } catch {}
+    await checkBrowserCacheLock(driver);
+    try {
+      executeStage(execute, "BROWSER_INSTALL", process.execPath, [path3.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
+    } catch (error) {
+      let ready = false;
+      try {
+        ready = doctor().status === "READY";
+      } catch {}
+      if (!ready)
+        throw error;
+      const code = error.errorCode || "BROWSER_INSTALL_FAILED";
+      warnings.push(`${code}_BUT_DRIVER_READY: browser assets passed the runtime dependency check; run doctor --browser-test before filling.`);
+      console.error(JSON.stringify({ status: "INSTALL_STAGE", stage: "BROWSER_INSTALL", phase: "VERIFIED_AFTER_FAILURE", warning: code }));
       return warnings;
     }
-  } catch {}
-  await checkBrowserCacheLock(driver);
-  try {
-    executeStage(execute, "BROWSER_INSTALL", process.execPath, [path3.join(driver, "node_modules/playwright/cli.js"), "install", "chromium"], EXECUTION_TIMEOUTS.browser);
-  } catch (error) {
-    let ready = false;
-    try {
-      ready = doctor().status === "READY";
-    } catch {}
-    if (!ready)
-      throw error;
-    const code = error.errorCode || "BROWSER_INSTALL_FAILED";
-    warnings.push(`${code}_BUT_DRIVER_READY: browser assets passed the runtime dependency check; run doctor --browser-test before filling.`);
-    console.error(JSON.stringify({ status: "INSTALL_STAGE", stage: "BROWSER_INSTALL", phase: "VERIFIED_AFTER_FAILURE", warning: code }));
+    if (doctor().status !== "READY")
+      throw new Error("DRIVER_NOT_READY");
     return warnings;
+  } finally {
+    if (browserCacheDir) {
+      if (previousBrowserPath === undefined)
+        delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+      else
+        process.env.PLAYWRIGHT_BROWSERS_PATH = previousBrowserPath;
+    }
   }
-  if (doctor().status !== "READY")
-    throw new Error("DRIVER_NOT_READY");
-  return warnings;
 }
 async function install(manifest, options, {
   execute = defaultExecute,
@@ -1134,6 +1152,7 @@ async function install(manifest, options, {
     const dataRoot = options.dataRoot ? path3.resolve(options.dataRoot) : null;
     const driver = path3.resolve(dataRoot ? path3.join(dataRoot, "driver") : options.driver || old?.driver_dir || path3.join(path3.dirname(destination), "ds160-driver"));
     const workspace = path3.resolve(dataRoot ? path3.join(dataRoot, "workspace") : options.workspace || old?.workspace || path3.join(path3.dirname(destination), "ds160-workspace"));
+    const browserCacheDir = platform === "linux" ? path3.resolve(old?.browser_cache_dir || path3.join(path3.dirname(workspace), "browsers")) : null;
     outside(destination, driver);
     outside(destination, workspace);
     if (old && dataRoot && (path3.resolve(old.driver_dir) !== driver || path3.resolve(old.workspace) !== workspace)) {
@@ -1172,7 +1191,7 @@ async function install(manifest, options, {
       ];
     };
     if (old?.archive_sha256 === artifact.sha256 && old.driver_dir === driver && old.workspace === workspace) {
-      const warnings = await prepareDriver(path3.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute);
+      const warnings = await prepareDriver(path3.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute, browserCacheDir);
       return {
         status: "ALREADY_INSTALLED",
         version: old.version,
@@ -1205,7 +1224,7 @@ async function install(manifest, options, {
       const version = JSON.parse(execute(executable, ["version"]));
       if (version.version !== manifest.version || version.build_id !== artifact.build_id)
         throw new Error("BINARY_IDENTITY_MISMATCH");
-      const driverWarnings = await prepareDriver(executable, driver, workspace, options.skipDependencies, execute);
+      const driverWarnings = await prepareDriver(executable, driver, workspace, options.skipDependencies, execute, browserCacheDir);
       const state = {
         schema_version: 1,
         tool: "ds160-runtime",
@@ -1216,6 +1235,7 @@ async function install(manifest, options, {
         profile_contract: manifest.profile_contract,
         driver_dir: driver,
         workspace,
+        ...browserCacheDir ? { browser_cache_dir: browserCacheDir } : {},
         installed_at: new Date().toISOString(),
         previous: old ? { directory: path3.basename(backup), version: old.version } : null
       };
@@ -1410,6 +1430,9 @@ For a first install, --dest must not exist; do not pre-create it. Updates reuse 
     throw new Error("SOURCE_INVALID");
   if (values.source && (values["manifest-file"] || values["candidate-archive"]))
     throw new Error("INVALID_ARGUMENT: --source is for public releases only");
+  if (process.platform === "linux" && process.getuid?.() === 0 && !values.check) {
+    throw new Error("LINUX_INSTALL_REQUIRES_NON_ROOT_USER: run installation, setup, and sessions as the same non-root user so Chromium can retain its sandbox.");
+  }
   const candidate = values["candidate-archive"] ? await candidateFromArchive(values["candidate-archive"]) : null;
   const allowLocal = Boolean(values["manifest-file"] || candidate);
   const remote = allowLocal ? null : await resolvePublicManifest(values.version, values.source || "auto");

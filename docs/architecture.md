@@ -1,7 +1,7 @@
 # Runtime Architecture and Data Flow
 
 This document explains how the installed DS-160 B1/B2 Skill operates, where its
-processes run, and how applicant data moves between the local workspace and official
+processes run, and how applicant data moves between the runner's workspace and official
 services. It is intended for users and Agents deciding whether to install or run the
 tool.
 
@@ -20,22 +20,24 @@ flowchart LR
   R <--> W[Private local workspace]
   I[Public installer] --> C
   I --> P
-  G[GitHub releases and dependency sources] --> I
+  G[GitHub or Gitee releases and dependency sources] --> I
 ```
 
-There is no project-operated cloud service in the application-data path.
+There is no project-operated cloud service in the application-data path. When a web
+Agent runs the tool, applicant files reside in that Agent host's VM or attached
+task storage; they are not automatically stored on the applicant's own computer.
 
 ## Runtime components
 
 | Component | Location | Responsibility |
 | --- | --- | --- |
-| Agent | User's computer | Reads the installed `SKILL.md`, gathers applicant facts, invokes commands, and presents human checkpoints. |
+| Agent | User's computer or private cloud VM | Reads the installed `SKILL.md`, gathers applicant facts, invokes commands, and presents human checkpoints. |
 | `ds160` CLI | Installed Skill directory | Validates command arguments and exposes profile, doctor, run, diagnostics, and session commands. |
-| Session broker | User's computer, loopback only | Lets one-shot Agent command tools communicate with a persistent runner. It binds to `127.0.0.1` on a random port and requires a random per-session token. |
+| Session broker | Same host as the runner, loopback only | Lets one-shot Agent command tools communicate with a persistent runner. It binds to `127.0.0.1` on a random port and requires a random per-session token. |
 | Runner and form engine | Local `ds160` process | Validates the profile, applies the B1/B2 page rules, manages recovery and Review, and enforces human authorization boundaries. |
 | Playwright | Separate local driver directory | Connects the runner to the browser using loopback Chrome DevTools Protocol (CDP). The installer pins the supported Playwright version. |
 | Chrome for Testing | Local Playwright browser cache | Displays and operates the official DS-160 website in a dedicated browser profile. It is separate from the user's normal browser profile. |
-| Workspace | Private local directory | Holds profiles, photos, browser state, logs, diagnostics, and saved documents created during use. |
+| Workspace | Private directory on the desktop host or web Agent task storage | Holds profiles, photos, browser state, logs, diagnostics, and saved documents created during use. |
 | CEAC and photo service | Official HTTPS hosts in the `state.gov` namespace | Receive the application values and photo that the applicant chooses to enter. |
 
 ## Command modes
@@ -71,7 +73,7 @@ Installation is a separate data path:
 ```text
 Official install.mjs
   -> stable.json or an exact public release manifest
-  -> GitHub release ZIP
+  -> selected GitHub or Gitee release ZIP
   -> SHA-256, file allowlist, release metadata, and binary identity checks
   -> pinned Playwright / Chromium installation when needed
 ```
@@ -95,6 +97,12 @@ This compatibility mode reduces browser defense in depth. The outer host sandbox
 dedicated profile, navigation restriction, visible browser, and human checkpoints
 remain part of the boundary. See [SECURITY.md](security.md) for the complete trust
 model and limitations.
+
+On Linux, headed Chromium uses an existing X display or a private Xvfb display.
+Before visiting CEAC, the runtime checks `chrome://sandbox` for active namespace
+isolation. A persistent challenge is shown as a private screenshot; the applicant
+chooses whether to refresh, click once, or cancel through the Agent's normal
+human checkpoint channel.
 
 ## Human authorization boundaries
 

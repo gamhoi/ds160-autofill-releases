@@ -11,11 +11,11 @@ see [SECURITY.md](security.md).
 ## Where data goes
 
 - Profiles, photos, browser state, diagnostics, logs, and saved PDFs may be stored
-  in directories on the user's computer. The installation keeps the Skill, browser
-  driver, and private workspace separate.
+  on the desktop host or in the web Agent's task VM and its attached storage. The
+  installation keeps the Skill, browser driver, and private workspace separate.
 - During filling, applicant information is entered into the U.S. Department of
   State CEAC website. A photo may be sent to CEAC's official photo service.
-- Installation and updates contact the project's GitHub release repository. Initial
+- Installation and updates contact the selected GitHub or Gitee release mirror. Initial
   setup may contact the Node.js/npm and Playwright distribution services to install
   the pinned browser driver and Chromium.
 
@@ -31,6 +31,9 @@ profiles, saved PDFs, or other applicant materials to a support issue.
 
 ## User responsibility
 
-Use private local directories, control access to the workspace, and remove retained
-files only after confirming they are no longer needed. The `clean` command does not
-delete final submission PDFs or arbitrary applicant files.
+Use private directories and control access to the workspace. On a web Agent,
+files may reside on host-managed storage outside the user's own computer; verify
+that other tasks cannot access the chosen data root before placing applicant
+material there. File permissions alone do not prove task isolation when tasks
+share a UID. Remove retained files only after confirming they are no longer needed.
+The `clean` command does not delete final submission PDFs or arbitrary applicant files.

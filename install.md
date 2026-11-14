@@ -1,13 +1,13 @@
 # DS-160 B1/B2 Skill: Agent Installation Protocol
 
 This document is intended for an Agent after the user has directed it here. It is the
-official installation entrypoint for a host with local terminal, internet, and desktop
-GUI access. Installing the Skill does not authorize filling, electronic signing, or
+official installation entrypoint for a host with local terminal, internet, and a
+desktop GUI or Linux Xvfb display. Installing the Skill does not authorize filling, electronic signing, or
 submission. Personal B1/B2 use is permanently free.
 
 ## What This Installs
 
-The installer places three separate components on the user's computer:
+The installer places three separate components on the runner host (a desktop or web Agent task VM):
 
 - the managed `ds160-autofill` Skill and platform executable;
 - a pinned Playwright driver and Chrome for Testing;
@@ -41,21 +41,40 @@ Supported platforms:
 
 - macOS Intel x64;
 - macOS Apple Silicon ARM64;
-- Windows x64.
+- Windows x64;
+- Linux x64 on supported Ubuntu/Debian releases with a non-root user, Chromium system dependencies, and an X11 display or Xvfb.
+
+On Linux, run the installer, `setup`, and sessions as the same non-root user.
+The installer stops early with `LINUX_INSTALL_REQUIRES_NON_ROOT_USER` if invoked
+as root. The installed package contains further Linux notes in
+`references/setup-linux.md`.
 
 Node.js 20 or newer and npm are needed only for installation and the external
 Playwright driver. The compiled runtime does not require a separate Bun installation.
-Use PowerShell for documented commands on Windows. For an ordinary installation,
-set `--dest` to `ds160-autofill` inside the Agent host's documented, persistent,
-user-level Skills directory. The host must discover it in a new task; a writable
-project or task directory is not a substitute. This does not require a system-wide
-or administrator-level installation. Choose a
-separate persistent, private, local data root that the Agent can use at runtime;
-the installer creates `driver/` and `workspace/` beneath it. A disposable task
-directory is suitable only for an isolated candidate test, not a reusable install.
-Do not put applicant files in the Skill or a synced/shared location. Installation
-under elevated permissions does not prove runtime access;
-the local and cross-call checks below verify that separately.
+Use PowerShell for documented commands on Windows. Choose the installation scope
+before selecting paths:
+
+- For a desktop Agent or a host that registers user Skills across tasks, set
+  `--dest` to `ds160-autofill` inside its documented, persistent user-level Skills
+  directory. Verify discovery in a new task. This does not require a system-wide
+  or administrator-level installation.
+- For a web Agent whose shell-installed Skills are not registered across tasks,
+  a task-scoped installation is supported. Choose separate Skill and data-root
+  paths in the current task's private storage, after confirming that the same
+  absolute paths survive VM replacement within that task. Read the installed
+  `SKILL.md` explicitly and use the installed executable by absolute path; a
+  shell installation does not register the Skill in the host's account-level
+  Skill catalog or make it discoverable in a new task. A new task needs its own
+  installation or the host's official Skill registration mechanism.
+
+The installer creates `driver/` and `workspace/` beneath the data root and, on
+Linux, keeps Chromium in `browsers/` there. Use the same non-root identity for
+installation and runtime. Do not infer persistence from a directory name or mount
+type: verify it on the intended host. Before using real applicant data on shared
+storage, confirm that other tasks cannot access the chosen private data root;
+permissions alone do not prove isolation when tasks share a UID. Do not put
+applicant files in the Skill. Installation under elevated permissions does not
+prove runtime access; the local and cross-call checks below verify that separately.
 
 ## Install or Update the Stable Version
 
@@ -64,16 +83,16 @@ the local and cross-call checks below verify that separately.
    - GitHub: https://gamhoi.github.io/ds160-autofill-releases/install.mjs
    - Gitee: https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.mjs
 
-2. Identify the host's registered user-level Skills directory before choosing
-   `--dest`; use `<that-directory>/ds160-autofill`. A user-specified Skill path
-   qualifies only if the host will discover it across tasks. Choose a separate,
-   persistent private data root. Do not invent a top-level home directory, assume
-   a task directory is synced merely from its name, or use the system temporary
-   directory for a real application. If the registered Skill location or its write
+2. For a cross-task desktop installation, identify the host's registered user-level
+   Skills directory and use `<that-directory>/ds160-autofill`. For a task-scoped
+   web installation, use the verified persistent task paths described above and
+   record their absolute values for later turns in the same task. Choose a separate
+   private data root. Do not invent a top-level home directory, assume a task
+   directory survives VM replacement merely from its name, or use the system
+   temporary directory for a real application. If the intended location or write
    permission is unclear, ask the user instead of silently installing into the
-   current project. Do not pre-create the final Skill directory. The isolated
-   candidate-test exception is in Release Testing below; it does not change the
-   destination for an ordinary stable installation.
+   current project. Do not pre-create the final Skill directory. The candidate
+   testing rules are in Release Testing below.
 
 3. Run the installer in a process session that can remain alive while Playwright and
    Chromium are installed:
@@ -110,6 +129,14 @@ them in order, using the installed paths recorded by the tool:
 
 The browser probes use synthetic local content and `about:blank`; they do not create,
 retrieve, sign, or submit a DS-160 application.
+
+On a task-scoped cloud installation, repeat `setup` and the browser-chain session
+probe after a VM replacement, using the original absolute paths without reinstalling
+when Skill, driver, workspace, and Chromium still exist. A live broker, runner, and
+Chromium process cannot survive VM replacement. Inspect any old session metadata and
+confirm the old processes are gone before cleanup or starting a new session; see the
+installed `references/runtime.md`. An application draft must be recovered through
+the normal retrieve flow, never by blindly repeating a protected action.
 
 ## When Something Fails
 

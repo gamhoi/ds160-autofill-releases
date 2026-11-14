@@ -33,6 +33,7 @@ const TARGETS = Object.freeze({
   'darwin:x64': { target: 'bun-darwin-x64', executable: 'bin/ds160' },
   'darwin:arm64': { target: 'bun-darwin-arm64', executable: 'bin/ds160' },
   'win32:x64': { target: 'bun-windows-x64', executable: 'bin/ds160.exe' },
+  'linux:x64': { target: 'bun-linux-x64', executable: 'bin/ds160' },
 });
 
 function usage() {
@@ -332,14 +333,14 @@ async function inspectHost() {
   return report;
 }
 
-async function inspectBrowserCache() {
+async function inspectBrowserCache(managedCache = null) {
   const configured = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  const location = configured || (process.platform === 'darwin'
+  const location = managedCache || configured || (process.platform === 'darwin'
     ? path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright')
     : process.platform === 'win32'
       ? path.join(process.env.LOCALAPPDATA || os.homedir(), 'ms-playwright')
       : path.join(os.homedir(), '.cache', 'ms-playwright'));
-  const result = { configured_by_environment: Boolean(configured), classification: classifyPath(location), exists: false, entries: [], locks: [] };
+  const result = { configured_by_environment: Boolean(configured), managed_data_root: Boolean(managedCache), classification: classifyPath(location), exists: false, entries: [], locks: [] };
   try {
     const entries = await readdir(location, { withFileTypes: true });
     result.exists = true;
@@ -351,7 +352,7 @@ async function inspectBrowserCache() {
   return result;
 }
 
-async function inspectDriver(driver, paths) {
+async function inspectDriver(driver, paths, managedCache = null) {
   if (!driver) return { provided: false };
   const root = path.resolve(driver);
   const result = { provided: true, marker: false, playwright: null, playwright_core: null, chromium: { resolved: false } };
@@ -366,8 +367,16 @@ async function inspectDriver(driver, paths) {
   if (result.playwright) {
     let executable;
     try {
+      const previous = process.env.PLAYWRIGHT_BROWSERS_PATH;
+      if (managedCache) process.env.PLAYWRIGHT_BROWSERS_PATH = managedCache;
       const require = createRequire(path.join(root, 'package.json'));
-      executable = require(path.join(root, 'node_modules/playwright')).chromium.executablePath();
+      try { executable = require(path.join(root, 'node_modules/playwright')).chromium.executablePath(); }
+      finally {
+        if (managedCache) {
+          if (previous === undefined) delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+          else process.env.PLAYWRIGHT_BROWSERS_PATH = previous;
+        }
+      }
     } catch (error) {
       result.chromium.resolve_status = 'FAIL';
       result.chromium.error = redactText(error.code || error.message, paths);
@@ -528,6 +537,8 @@ export async function createInstallReport(options) {
     installer: options.installer ? path.resolve(options.installer) : null,
     candidateArchive: options.candidateArchive ? path.resolve(options.candidateArchive) : null,
   };
+  const managedCache = process.platform === 'linux' && paths.workspace
+    ? path.join(path.dirname(paths.workspace), 'browsers') : null;
   const report = {
     schema_version: REPORT_SCHEMA,
     checker_version: CHECKER_VERSION,
@@ -546,9 +557,9 @@ export async function createInstallReport(options) {
     ]),
     network: options.network ? await Promise.all(Object.entries(OFFICIAL_URLS).map(([name, url]) => probeUrl(name, url))) : { skipped: true },
     before: {
-      browser_cache: await inspectBrowserCache(),
+      browser_cache: await inspectBrowserCache(managedCache),
       installation: await inspectInstallation(paths.destination),
-      driver: await inspectDriver(paths.driver, paths),
+      driver: await inspectDriver(paths.driver, paths, managedCache),
     },
   };
   report.installation_context = {
@@ -557,9 +568,9 @@ export async function createInstallReport(options) {
   };
   report.installer_exercise = await exerciseInstaller(options, paths);
   report.after = {
-    browser_cache: await inspectBrowserCache(),
+    browser_cache: await inspectBrowserCache(managedCache),
     installation: await inspectInstallation(paths.destination),
-    driver: await inspectDriver(paths.driver, paths),
+    driver: await inspectDriver(paths.driver, paths, managedCache),
   };
   report.runtime_doctor = await runDoctor(options, paths);
   report.findings = deriveFindings(report);

@@ -11,7 +11,7 @@ Skill 会把申请材料整理成经过校验的本地 profile，通过独立且
 
 ## 快速开始
 
-1. 把下面这段话发送给拥有本地终端和桌面浏览器权限的 Agent：
+1. 把下面这段话发送给拥有终端及有头浏览器或 Linux Xvfb 的 Agent：
 
 ```text
 请按照 DS-160 B1/B2 Skill 的官方指南安装或更新：
@@ -21,8 +21,10 @@ https://gamhoi.github.io/ds160-autofill-releases/install.md
 
 只使用指南提供的公开安装器。安装不代表我授权填写、电子签名或提交；
 执行这些操作前，请分别向我确认并取得授权。
-请把 Skill 安装到本 Agent 宿主可跨任务发现的持久用户级 Skills 目录，
-运行数据另放在独立的本地私有目录。
+桌面 Agent 请把 Skill 安装到可跨任务发现的持久用户级 Skills 目录。
+若网页 Agent 不会把命令行安装的 Skill 登记到账号，请安装在本任务已验证跨 VM
+仍可访问的目录，并从该路径读取 SKILL.md；运行数据另放在独立私有目录。
+存放申请材料前，请确认其他任务无法访问该数据目录。
 ```
 
 2. Agent 报告安装、浏览器测试和运行通道准备完成后，提供申请材料，并回答材料中缺失的
@@ -54,8 +56,9 @@ flowchart LR
   R <--> W[本地私有工作区]
 ```
 
-项目不运行用于接收申请人资料的后台服务。申请文件保留在用户本地工作区；只有在填写
-美国国务院官方 CEAC 和 `state.gov` 照片服务页面时，相关字段值和照片才会发送给官方
+项目不运行用于接收申请人资料的后台服务。申请文件保留在运行时工作区，可能位于
+用户桌面电脑，也可能位于网页 Agent 的任务 VM；填写美国国务院官方 CEAC 和
+`state.gov` 照片服务页面时，相关字段值和照片会发送给官方
 网站。安装过程中会访问所选 GitHub 或 Gitee 镜像，也可能访问 npm 和 Playwright
 浏览器分发服务。
 
@@ -68,9 +71,13 @@ flowchart LR
 | Windows | x64 |
 | macOS | Intel x64 |
 | macOS | Apple Silicon ARM64 |
+| Linux | x64（Ubuntu 22.04/24.04 或 Debian 12/13） |
 
 安装依赖 Node.js 20 或更高版本以及 npm。安装后的 Runtime 是对应平台的可执行文件；
-Playwright 和 Chrome for Testing 会独立安装，并固定到受支持的版本。
+Playwright 和 Chrome for Testing 会独立安装，并固定到受支持的版本。Linux 还需要
+非 root 运行用户、Chromium 系统依赖，以及可用的 X11 显示或 Xvfb；安装、setup 和
+会话必须使用同一用户。网页 Agent 应选择已验证可跨 VM 更换保留的任务目录；
+账号级 Skill 注册取决于宿主平台。具体检查见[安装协议](install.md)。
 
 ## 信任、隐私与限制
 

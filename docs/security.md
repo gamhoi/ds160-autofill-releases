@@ -38,7 +38,7 @@ project therefore does not claim that every browser packet is addressed only to 
 `state.gov` IP or hostname. The compatibility-mode restriction described below
 applies to top-level page navigation.
 
-Installation and updates can contact the project's GitHub Pages and GitHub Releases,
+Installation and updates can contact the selected GitHub or Gitee release mirror,
 npm, and Playwright browser distribution services. The product has no developer-
 operated telemetry, analytics, licensing, account, or applicant-data endpoint.
 
@@ -57,8 +57,11 @@ The runtime needs permission to:
 - connect to the official website and local loopback services.
 
 Applicant files are not encrypted by the product. Anyone with access to the
-workspace may be able to read them. Use a private local directory, avoid shared or
-network-mounted folders, and review files before sharing or deleting them.
+workspace may be able to read them. On a desktop, use a private local directory.
+On a web Agent, a task-scoped persistent volume may be necessary to survive VM
+replacement; verify its actual cross-task access isolation before storing applicant
+material. A directory mode of 0700 is insufficient if tasks share the same UID.
+Review files before sharing or deleting them.
 
 The dedicated browser profile disables Chrome's address, payment-card, credential,
 and password-saving features. This prevents browser save prompts during form filling

@@ -53,6 +53,15 @@ be reviewed before sharing.
 
 ## Common Outcomes
 
+- `LINUX_INSTALL_REQUIRES_NON_ROOT_USER` or `CHROMIUM_ROOT_UNSUPPORTED`:
+  run installation, setup, and sessions as the same non-root user in user-owned
+  directories. Reinstall a root-owned candidate in a new location; do not disable
+  Chromium's sandbox.
+- `CHROMIUM_SANDBOX_HELPER_INVALID` or `CHROMIUM_SANDBOX_UNCONFIRMED`:
+  see `references/setup-linux.md`. An invalid configured helper may be unset only
+  when the host's kernel namespace sandbox is available and verifies successfully.
+- `LINUX_DISPLAY_UNAVAILABLE`: check that the existing `DISPLAY` serves an X11
+  session or that Xvfb is installed and can start under the runtime user.
 - `NO_STABLE_RELEASE`: the public stable pointer is unavailable or invalid; do not
   silently install a prerelease.
 - `CHROMIUM_NOT_INSTALLED` or driver mismatch: rerun the official installer against

@@ -3,24 +3,26 @@
 Ordinary users should install the stable channel from `install.md`. The routes below
 are for maintainer-directed acceptance testing and never silently replace stable.
 Choose the test root before installing. If the user provided one, verify that it
-is private, local, and neither a repository nor a synced or shared volume. If not,
-first consider the Agent host's current authorized local task directory. Verify
-its actual properties and that it will remain available throughout this test;
-do not assume that a home-directory path is permitted or that a task directory
-is durable enough for later real applications. If neither location qualifies,
-ask the user for a suitable root instead of inventing one under the home directory.
+is private to the intended task, writable by the runtime user, and outside a source
+repository. A cloud host may require a task-scoped persistent volume so the Skill,
+driver, and browser survive VM replacement. Check the volume's actual persistence
+and access isolation; a 0700 directory alone does not isolate data when tasks share
+the same UID. If the user did not provide a root, first consider the Agent host's
+authorized task directory and verify these properties. Do not assume that a home
+directory is permitted or durable. If no suitable location exists, ask the user.
 
 For example, choose `<authorized-test-root>/ds160-test/skill` as the Skill
 destination and `<authorized-test-root>/ds160-test/data` as the data root. The
 installer derives `driver/` and `workspace/` inside that data root. Run the
 returned `setup` and cross-call session probe in the intended runtime mode;
 installation under different privileges is not sufficient evidence.
-This isolated Skill destination is an explicit exception to the ordinary install
-location: a candidate test need not be discoverable in later Agent tasks. When the
-user has authorized an isolated candidate test root, do not ask for confirmation
-merely because it is not the host's registered Skills directory. An ordinary
-reusable installation belongs in that discoverable user-level directory, with a
-persistent private data root.
+This isolated Skill destination is an explicit exception to the cross-task desktop
+install location: a candidate test need not be discoverable in later Agent tasks.
+When the user has authorized an isolated candidate test root, do not ask for
+confirmation merely because it is not the host's registered Skills directory.
+For ordinary use, follow the desktop or task-scoped web installation scope in
+`install.md`; a task-scoped web installation must survive VM replacement within
+that task but need not be discoverable in a different task.
 
 ## Trusted Local Candidate
 

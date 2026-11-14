@@ -13,7 +13,7 @@ Department of State.
 
 ## Quick Start
 
-1. Send this prompt to an Agent with local terminal and desktop-browser access:
+1. Send this prompt to an Agent with a terminal and a headed browser or Linux Xvfb:
 
 ```text
 Please install or update the DS-160 B1/B2 Skill using its official guide:
@@ -23,8 +23,11 @@ https://gitee.com/gamhoi/ds160-autofill-releases/raw/master/install.md
 
 Use only the guide's public installer. Installation does not authorize filling,
 electronic signing, or submission; ask me separately before each of those actions.
-Install the Skill in this Agent host's persistent user-level Skills directory so
-it is available in later tasks, with a separate private local data directory.
+On a desktop Agent, install the Skill in its persistent user-level Skills
+directory so it is available in later tasks. On a web Agent without account-level
+registration for shell-installed Skills, install it in this task's verified
+VM-persistent directory and read SKILL.md from that path. Keep a separate private
+data root. Check task isolation before storing applicant material there.
 ```
 
 2. After the Agent reports that installation, the browser test, and the runtime
@@ -61,8 +64,9 @@ flowchart LR
 ```
 
 There is no project-operated applicant-data backend. Applicant files remain in the
-user's local workspace; values and photos are transmitted only when filling the
-official CEAC and `state.gov` photo-service pages. Installation contacts the selected
+runner's workspace, which may be on the user's desktop or the web Agent's task VM.
+Values and photos are transmitted when filling the official CEAC and `state.gov`
+photo-service pages. Installation contacts the selected
 GitHub or Gitee mirror and may contact npm and the Playwright browser distribution service.
 
 [Read the architecture and data-flow details](docs/architecture.md).
@@ -74,10 +78,15 @@ GitHub or Gitee mirror and may contact npm and the Playwright browser distributi
 | Windows | x64 |
 | macOS | Intel x64 |
 | macOS | Apple Silicon ARM64 |
+| Linux | x64 (Ubuntu 22.04/24.04 or Debian 12/13) |
 
 Node.js 20 or newer and npm are installation dependencies. The installed runtime is a
 platform executable; Playwright and Chrome for Testing are installed separately and
-pinned to the supported version.
+pinned to the supported version. Linux requires a non-root runtime user, Chromium
+system dependencies, and a working X11 display or Xvfb. The installer, setup, and
+sessions must run as the same user. On a web Agent, choose a task directory proven to
+survive VM replacement; account-level Skill registration is host-specific. See the
+[installation protocol](install.md) for the required setup and cross-call probe.
 
 ## Trust, Privacy, and Limitations
 
