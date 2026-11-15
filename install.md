@@ -62,26 +62,29 @@ before selecting paths:
   directory. Verify discovery in a new task. This does not require a system-wide
   or administrator-level installation.
 - For a web Agent whose shell-installed Skills are not registered across tasks,
-  a task-scoped installation is supported. Choose separate Skill and data-root
-  paths in the current task's storage, writable by the same non-root runtime user.
+  a task-scoped installation is supported. Select the host's documented task
+  storage, where possible the storage intended to survive VM replacement. Choose
+  separate Skill and data-root paths writable by the same non-root runtime user.
   Record their absolute paths and read the installed `SKILL.md` explicitly. Use the
-  installed executable by absolute path. Cross-VM persistence remains unverified
-  until the same paths are checked after an actual VM replacement; that uncertainty
-  does not block installation or the local synthetic browser probe. A
-  shell installation does not register the Skill in the host's account-level
-  Skill catalog or make it discoverable in a new task. A new task needs its own
-  installation or the host's official Skill registration mechanism.
+  installed executable by absolute path. An actual VM replacement is the time to
+  test whether those paths survived; this is not an installation prerequisite and
+  does not require a user decision. A shell installation does not register the
+  Skill in the host's account-level catalog or make it discoverable in a new task.
 
 The installer creates `driver/` and `workspace/` beneath the data root and, on
 Linux, keeps Chromium in `browsers/` there. Use the same non-root identity for
-installation and runtime. Do not infer persistence from a directory name or mount
-type: verify it on the intended host. Before using real applicant data on shared
-storage, confirm that other tasks cannot access the chosen private data root;
-permissions alone do not prove isolation when tasks share a UID. Do not put
-applicant files in the Skill. Installation under elevated permissions does not
-prove runtime access; the local and cross-call checks below verify that separately.
-Unverified data isolation does not block installing the Skill or synthetic probes,
-but it does block storing applicant material. Report the unresolved condition.
+installation and runtime. Select paths from the host's task-storage conventions;
+do not infer persistence solely from a directory name, mount type, or device ID.
+For real applicant data, use host-designated task-private storage with owner-only
+permissions. Those permissions alone do not establish isolation if tasks share a
+UID. If there is concrete evidence that another task can read the proposed data
+root or uploaded originals, do not copy more applicant data there; explain that
+specific exposure once and use a safer location if available. If no suitable
+location exists, stop before storing applicant data. This does not block Skill
+installation or synthetic probes. Do not put applicant files in the Skill.
+Treat mount choice, paths, permissions, and the current stable version as Agent
+implementation details. Report the chosen location and any material limitation
+briefly; request user input only for a concrete unresolved blocker.
 
 ## Install or Update the Stable Version
 
@@ -92,15 +95,14 @@ but it does block storing applicant material. Report the unresolved condition.
 
 2. For a cross-task desktop installation, identify the host's registered user-level
    Skills directory and use `<that-directory>/ds160-autofill`. For a task-scoped
-   web installation, use writable task paths as described above and record their
-   absolute values for later turns in the same task. Choose a separate data root;
-   do not store applicant material there until task isolation is confirmed.
-   Do not invent a top-level home directory, assume a task directory survives
-   VM replacement merely from its name, or use the system
-   temporary directory for a real application. If the intended location or write
-   permission is unclear, ask the user instead of silently installing into the
-   current project. Do not pre-create the final Skill directory. The candidate
-   testing rules are in Release Testing below.
+   web installation, select writable task paths as described above and retain their
+   absolute values for later turns. Choose a separate data root. If the host has no
+   private persistent location, the Skill may be kept in task-persistent storage
+   while the data root uses a private local directory; report that browser assets
+   and applicant data may need to be restored after VM replacement. Do not use a
+   system temporary directory for a real application. Choose paths and permissions without asking
+   the user unless no safe writable location exists. Do not pre-create the final
+   Skill directory. The candidate testing rules are in Release Testing below.
 
 3. Run the installer in a process session that can remain alive while Playwright and
    Chromium are installed:

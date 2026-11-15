@@ -58,9 +58,10 @@ The runtime needs permission to:
 
 Applicant files are not encrypted by the product. Anyone with access to the
 workspace may be able to read them. On a desktop, use a private local directory.
-On a web Agent, a task-scoped persistent volume may be necessary to survive VM
-replacement; verify its actual cross-task access isolation before storing applicant
-material. A directory mode of 0700 is insufficient if tasks share the same UID.
+On a web Agent, task-scoped storage may be necessary to survive VM replacement.
+The Agent should choose host-designated task-private storage; if it finds concrete
+cross-task access to that location, it must not store applicant material there.
+A directory mode of 0700 is insufficient if tasks share the same UID.
 Review files before sharing or deleting them.
 
 The dedicated browser profile disables Chrome's address, payment-card, credential,

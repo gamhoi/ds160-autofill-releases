@@ -32,8 +32,10 @@ profiles, saved PDFs, or other applicant materials to a support issue.
 ## User responsibility
 
 Use private directories and control access to the workspace. On a web Agent,
-files may reside on host-managed storage outside the user's own computer; verify
-that other tasks cannot access the chosen data root before placing applicant
-material there. File permissions alone do not prove task isolation when tasks
-share a UID. Remove retained files only after confirming they are no longer needed.
+files may reside on host-managed storage outside the user's own computer. The
+Agent should select the host's task-private storage and restrict file access;
+file permissions alone do not prove task isolation when tasks share a UID. If
+the Agent finds concrete cross-task access to the chosen location, it should
+avoid storing applicant material there and report that specific risk. Remove
+retained files only after confirming they are no longer needed.
 The `clean` command does not delete final submission PDFs or arbitrary applicant files.
