@@ -26,9 +26,10 @@ Use only the guide's public installer. Installation does not authorize filling,
 electronic signing, or submission; ask me separately before each of those actions.
 On a desktop Agent, install the Skill in its persistent user-level Skills
 directory so it is available in later tasks. On a web Agent without account-level
-registration for shell-installed Skills, install it in this task's verified
-VM-persistent directory and read SKILL.md from that path. Keep a separate private
-data root. Check task isolation before storing applicant material there.
+registration for shell-installed Skills, install in writable task storage, record
+the paths, and read the installed SKILL.md. Cross-VM persistence can be tested
+later; report it as unverified until then. Keep applicant data separate and do not
+accept it until task isolation is confirmed.
 ```
 
 2. After the Agent reports that installation, the browser test, and the runtime
@@ -85,8 +86,8 @@ Node.js 20 or newer and npm are installation dependencies. The installed runtime
 platform executable; Playwright and Chrome for Testing are installed separately and
 pinned to the supported version. Linux requires a non-root runtime user, Chromium
 system dependencies, and a working X11 display or Xvfb. The installer, setup, and
-sessions must run as the same user. On a web Agent, choose a task directory proven to
-survive VM replacement; account-level Skill registration is host-specific. See the
+sessions must run as the same user. On a web Agent, recheck the recorded task paths
+after VM replacement; account-level Skill registration is host-specific. See the
 [installation protocol](install.md) for the required setup and cross-call probe.
 
 ## Trust, Privacy, and Limitations

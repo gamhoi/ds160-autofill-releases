@@ -48,6 +48,9 @@ On Linux, run the installer, `setup`, and sessions as the same non-root user.
 The installer stops early with `LINUX_INSTALL_REQUIRES_NON_ROOT_USER` if invoked
 as root. The installed package contains further Linux notes in
 `references/setup-linux.md`.
+If the Agent shell starts as root, it may prepare a fresh task-specific private
+directory owned by an existing non-root user, then run all DS-160 commands as
+that user. Do not relax permissions on shared parent directories.
 
 Node.js 20 or newer and npm are needed only for installation and the external
 Playwright driver. The compiled runtime does not require a separate Bun installation.
@@ -60,9 +63,11 @@ before selecting paths:
   or administrator-level installation.
 - For a web Agent whose shell-installed Skills are not registered across tasks,
   a task-scoped installation is supported. Choose separate Skill and data-root
-  paths in the current task's private storage, after confirming that the same
-  absolute paths survive VM replacement within that task. Read the installed
-  `SKILL.md` explicitly and use the installed executable by absolute path; a
+  paths in the current task's storage, writable by the same non-root runtime user.
+  Record their absolute paths and read the installed `SKILL.md` explicitly. Use the
+  installed executable by absolute path. Cross-VM persistence remains unverified
+  until the same paths are checked after an actual VM replacement; that uncertainty
+  does not block installation or the local synthetic browser probe. A
   shell installation does not register the Skill in the host's account-level
   Skill catalog or make it discoverable in a new task. A new task needs its own
   installation or the host's official Skill registration mechanism.
@@ -75,6 +80,8 @@ storage, confirm that other tasks cannot access the chosen private data root;
 permissions alone do not prove isolation when tasks share a UID. Do not put
 applicant files in the Skill. Installation under elevated permissions does not
 prove runtime access; the local and cross-call checks below verify that separately.
+Unverified data isolation does not block installing the Skill or synthetic probes,
+but it does block storing applicant material. Report the unresolved condition.
 
 ## Install or Update the Stable Version
 
@@ -85,10 +92,11 @@ prove runtime access; the local and cross-call checks below verify that separate
 
 2. For a cross-task desktop installation, identify the host's registered user-level
    Skills directory and use `<that-directory>/ds160-autofill`. For a task-scoped
-   web installation, use the verified persistent task paths described above and
-   record their absolute values for later turns in the same task. Choose a separate
-   private data root. Do not invent a top-level home directory, assume a task
-   directory survives VM replacement merely from its name, or use the system
+   web installation, use writable task paths as described above and record their
+   absolute values for later turns in the same task. Choose a separate data root;
+   do not store applicant material there until task isolation is confirmed.
+   Do not invent a top-level home directory, assume a task directory survives
+   VM replacement merely from its name, or use the system
    temporary directory for a real application. If the intended location or write
    permission is unclear, ask the user instead of silently installing into the
    current project. Do not pre-create the final Skill directory. The candidate
