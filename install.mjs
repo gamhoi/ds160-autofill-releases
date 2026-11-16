@@ -1141,6 +1141,8 @@ async function install(manifest, options, {
   const target = `bun-${platform === "win32" ? "windows" : platform}-${arch}`;
   if (!Object.hasOwn(TARGETS, target) || !manifest.artifacts[target])
     throw new Error("PLATFORM_NOT_SUPPORTED");
+  if (options.dependencyRoot && platform !== "linux")
+    throw new Error("DEPENDENCY_ROOT_LINUX_ONLY");
   const destination = path3.resolve(options.destination);
   await mkdir3(path3.dirname(destination), { recursive: true });
   return withInstallationLock(destination, async () => {
@@ -1150,13 +1152,27 @@ async function install(manifest, options, {
     if (old && compareVersions(manifest.version, old.version) < 0 && !options.allowDowngrade)
       throw new Error("DOWNGRADE_REQUIRES_EXPLICIT_PERMISSION");
     const dataRoot = options.dataRoot ? path3.resolve(options.dataRoot) : null;
-    const driver = path3.resolve(dataRoot ? path3.join(dataRoot, "driver") : options.driver || old?.driver_dir || path3.join(path3.dirname(destination), "ds160-driver"));
+    const dependencyRoot = options.dependencyRoot ? path3.resolve(options.dependencyRoot) : null;
     const workspace = path3.resolve(dataRoot ? path3.join(dataRoot, "workspace") : options.workspace || old?.workspace || path3.join(path3.dirname(destination), "ds160-workspace"));
-    const browserCacheDir = platform === "linux" ? path3.resolve(old?.browser_cache_dir || path3.join(path3.dirname(workspace), "browsers")) : null;
+    const driver = path3.resolve(dependencyRoot ? path3.join(dependencyRoot, "driver") : old?.driver_dir || (dataRoot ? path3.join(dataRoot, "driver") : options.driver || path3.join(path3.dirname(destination), "ds160-driver")));
+    const browserCacheDir = platform === "linux" ? path3.resolve(dependencyRoot ? path3.join(dependencyRoot, "browsers") : old?.browser_cache_dir || path3.join(path3.dirname(workspace), "browsers")) : null;
     outside(destination, driver);
     outside(destination, workspace);
-    if (old && dataRoot && (path3.resolve(old.driver_dir) !== driver || path3.resolve(old.workspace) !== workspace)) {
-      throw new Error("INSTALL_DATA_ROOT_MISMATCH: this Skill is already bound to different driver/workspace paths. Preserve the existing installation or use a new Skill destination.");
+    if (browserCacheDir)
+      outside(destination, browserCacheDir);
+    if (old && dataRoot && path3.resolve(old.workspace) !== workspace) {
+      throw new Error("INSTALL_DATA_ROOT_MISMATCH: this Skill is already bound to a different private workspace. Preserve it or use a new Skill destination.");
+    }
+    if (dependencyRoot) {
+      if (!dataRoot)
+        throw new Error("DEPENDENCY_ROOT_INVALID: a separate private --data-root is required.");
+      if (dependencyRoot === dataRoot || dependencyRoot.startsWith(`${dataRoot}${path3.sep}`) || dataRoot?.startsWith(`${dependencyRoot}${path3.sep}`)) {
+        throw new Error("DEPENDENCY_ROOT_NOT_SEPARATE: dependencies and the private data root must be in separate directory trees.");
+      }
+      outside(destination, dependencyRoot);
+      await mkdir3(dependencyRoot, { recursive: true, mode: 448 });
+      if ((await lstat(dependencyRoot)).isSymbolicLink())
+        throw new Error("DEPENDENCY_ROOT_SYMLINK_NOT_ALLOWED");
     }
     if (dataRoot) {
       await mkdir3(dataRoot, { recursive: true, mode: 448 });
@@ -1190,7 +1206,7 @@ async function install(manifest, options, {
         { action: "VALIDATE_PROFILE_BEFORE_CEAC" }
       ];
     };
-    if (old?.archive_sha256 === artifact.sha256 && old.driver_dir === driver && old.workspace === workspace) {
+    if (old?.archive_sha256 === artifact.sha256 && old.driver_dir === driver && old.workspace === workspace && (platform !== "linux" || path3.resolve(old.browser_cache_dir || path3.join(path3.dirname(workspace), "browsers")) === browserCacheDir)) {
       const warnings = await prepareDriver(path3.join(destination, artifact.executable), driver, workspace, options.skipDependencies, execute, browserCacheDir);
       return {
         status: "ALREADY_INSTALLED",
@@ -1198,6 +1214,7 @@ async function install(manifest, options, {
         destination,
         driver_dir: driver,
         workspace,
+        ...browserCacheDir ? { browser_cache_dir: browserCacheDir } : {},
         warnings,
         next_steps: nextSteps()
       };
@@ -1266,6 +1283,7 @@ async function install(manifest, options, {
         destination,
         driver_dir: driver,
         workspace,
+        ...browserCacheDir ? { browser_cache_dir: browserCacheDir } : {},
         previous_version: old?.version,
         warnings,
         next_steps: nextSteps()
@@ -1302,15 +1320,22 @@ async function rollback(destination, { execute = defaultExecute } = {}) {
     if (state.profile_contract !== current.profile_contract || state.target !== current.target)
       throw new Error("ROLLBACK_CONTRACT_INCOMPATIBLE");
     const executable = path3.join(previous, TARGETS[state.target].executable);
-    if (JSON.parse(execute(executable, ["doctor", "--driver-dir", current.driver_dir, "--workspace", current.workspace])).status !== "READY")
-      throw new Error("ROLLBACK_DRIVER_NOT_READY");
     const backup = path3.join(path3.dirname(destination), `.${path3.basename(destination)}.previous-${randomUUID3()}`);
     state.driver_dir = current.driver_dir;
     state.workspace = current.workspace;
+    if (current.browser_cache_dir)
+      state.browser_cache_dir = current.browser_cache_dir;
     state.previous = { directory: path3.basename(backup), version: current.version };
     const originalState = await readFile3(path3.join(previous, STATE));
     await replaceState(previous, `${JSON.stringify(state, null, 2)}
 `);
+    try {
+      if (JSON.parse(execute(executable, ["doctor"])).status !== "READY")
+        throw new Error("ROLLBACK_DRIVER_NOT_READY");
+    } catch (error) {
+      await replaceState(previous, originalState);
+      throw error;
+    }
     let moved = false;
     try {
       await rename3(destination, backup);
@@ -1373,6 +1398,7 @@ async function main(argv = process.argv.slice(2)) {
   const { values, tokens } = parseArgs({ args: argv, tokens: true, options: {
     dest: { type: "string" },
     "data-root": { type: "string" },
+    "dependency-root": { type: "string" },
     "driver-dir": { type: "string" },
     workspace: { type: "string" },
     version: { type: "string" },
@@ -1394,8 +1420,8 @@ async function main(argv = process.argv.slice(2)) {
       seen.add(token.name);
     }
   if (values.help) {
-    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> --data-root <absolute-private-data-directory> [--source auto|github|gitee] [--version <exact-public-version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback | --uninstall]
-For a first install, --dest must not exist; do not pre-create it. Updates reuse a directory managed by this installer. The installer derives driver/ and workspace/ beneath --data-root. --candidate-archive installs an explicitly trusted local candidate. --uninstall preserves driver and workspace data.`);
+    console.log(`Usage: node install.mjs --dest <absolute-skill-directory> --data-root <absolute-private-data-directory> [--dependency-root <absolute-linux-dependency-directory>] [--source auto|github|gitee] [--version <exact-public-version> | --candidate-archive <trusted-local-zip> | --manifest-file <local-manifest>] [--check | --rollback | --uninstall]
+For a first install, --dest must not exist; do not pre-create it. Updates reuse a directory managed by this installer. On Linux, --dependency-root stores Playwright and Chromium separately from the private workspace under --data-root. --candidate-archive installs an explicitly trusted local candidate. --uninstall preserves dependencies and workspace data.`);
     return;
   }
   for (const key of ["version", "source", "manifest-file", "candidate-archive"]) {
@@ -1408,14 +1434,14 @@ For a first install, --dest must not exist; do not pre-create it. Updates reuse 
     throw new Error("INVALID_ARGUMENT: use --data-root instead of separate driver/workspace paths.");
   if ([values.check, values.rollback, values.uninstall].filter(Boolean).length > 1)
     throw new Error("INVALID_ARGUMENT: choose one of check, rollback or uninstall");
-  if (values.rollback && (values.version || values.source || values["manifest-file"] || values["candidate-archive"]))
+  if (values.rollback && (values.version || values.source || values["manifest-file"] || values["candidate-archive"] || values["dependency-root"]))
     throw new Error("INVALID_ARGUMENT: incompatible rollback options");
   if (values.rollback) {
     console.log(JSON.stringify(await rollback(values.dest)));
     return;
   }
   if (values.uninstall) {
-    if (values.version || values.source || values["manifest-file"] || values["candidate-archive"] || values["data-root"] || values["skip-dependencies"] || values["allow-downgrade"])
+    if (values.version || values.source || values["manifest-file"] || values["candidate-archive"] || values["data-root"] || values["dependency-root"] || values["skip-dependencies"] || values["allow-downgrade"])
       throw new Error("INVALID_ARGUMENT: uninstall accepts only --dest");
     console.log(JSON.stringify(await uninstall(values.dest)));
     return;
@@ -1424,6 +1450,8 @@ For a first install, --dest must not exist; do not pre-create it. Updates reuse 
     throw new Error("VERSION_INVALID");
   if (!values.check && (!values["data-root"] || !path3.isAbsolute(values["data-root"])))
     throw new Error("DATA_ROOT_REQUIRED: provide an absolute persistent private data directory.");
+  if (values["dependency-root"] && (!path3.isAbsolute(values["dependency-root"]) || !values["data-root"]))
+    throw new Error("DEPENDENCY_ROOT_INVALID: provide --data-root and an absolute, separate --dependency-root.");
   if ([values.version, values["manifest-file"], values["candidate-archive"]].filter(Boolean).length > 1)
     throw new Error("INVALID_ARGUMENT: choose one of version, manifest-file or candidate-archive");
   if (values.source && !["auto", ...Object.keys(SOURCES)].includes(values.source))
@@ -1458,6 +1486,7 @@ For a first install, --dest must not exist; do not pre-create it. Updates reuse 
   console.log(JSON.stringify(await install(manifest, {
     destination: values.dest,
     dataRoot: values["data-root"],
+    dependencyRoot: values["dependency-root"],
     skipDependencies: values["skip-dependencies"],
     allowDowngrade: values["allow-downgrade"],
     allowLocal,

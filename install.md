@@ -65,14 +65,20 @@ before selecting paths:
   a task-scoped installation is supported. Select the host's documented task
   storage, where possible the storage intended to survive VM replacement. Choose
   separate Skill and data-root paths writable by the same non-root runtime user.
+  On Linux, if the private data root is on VM-local storage, also select a
+  task-persistent `--dependency-root` for Playwright and Chromium. These are
+  reusable program dependencies; keep application materials and the browser
+  profile in the private data root.
   Record their absolute paths and read the installed `SKILL.md` explicitly. Use the
   installed executable by absolute path. An actual VM replacement is the time to
   test whether those paths survived; this is not an installation prerequisite and
   does not require a user decision. A shell installation does not register the
   Skill in the host's account-level catalog or make it discoverable in a new task.
 
-The installer creates `driver/` and `workspace/` beneath the data root and, on
-Linux, keeps Chromium in `browsers/` there. Use the same non-root identity for
+By default, the installer creates `driver/` and `workspace/` beneath the data
+root and, on Linux, keeps Chromium in `browsers/` there. On Linux,
+`--dependency-root` instead keeps `driver/` and `browsers/` under that separate
+root while `workspace/` stays under `--data-root`. Use the same non-root identity for
 installation and runtime. Select paths from the host's task-storage conventions;
 do not infer persistence solely from a directory name, mount type, or device ID.
 For real applicant data, use host-designated task-private storage with owner-only
@@ -97,9 +103,11 @@ briefly; request user input only for a concrete unresolved blocker.
    Skills directory and use `<that-directory>/ds160-autofill`. For a task-scoped
    web installation, select writable task paths as described above and retain their
    absolute values for later turns. Choose a separate data root. If the host has no
-   private persistent location, the Skill may be kept in task-persistent storage
-   while the data root uses a private local directory; report that browser assets
-   and applicant data may need to be restored after VM replacement. Do not use a
+   private persistent location, keep the Skill and Linux dependency root in
+   task-persistent storage while the data root uses a private local directory.
+   After VM replacement the applicant workspace may need to be restored, but
+   the pinned Playwright and Chromium assets can be reused without downloading.
+   Do not use a
    system temporary directory for a real application. Choose paths and permissions without asking
    the user unless no safe writable location exists. Do not pre-create the final
    Skill directory. The candidate testing rules are in Release Testing below.
@@ -110,6 +118,14 @@ briefly; request user input only for a concrete unresolved blocker.
 ```text
 node <downloaded-install.mjs> --dest <absolute-skill-folder> --data-root <absolute-private-data-root>
 ```
+
+On Linux, when the private data root is VM-local but the task has persistent
+storage for program files, also pass `--dependency-root <absolute-task-persistent-dependency-directory>`.
+For an existing managed installation, reuse the same `--dest` and `--data-root`
+and add `--dependency-root` once to migrate the dependency paths. The installer
+does not copy or move applicant files. Later updates remember the dependency
+paths from the installation state, so the extra argument need not be repeated.
+If the private data root is itself task-persistent, the default layout is sufficient.
 
 The command installs or updates only the stable version selected by `stable.json`.
 By default, it checks both official manifests and selects the faster responding source.
